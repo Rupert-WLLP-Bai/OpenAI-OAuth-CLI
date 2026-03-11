@@ -46,3 +46,26 @@ PRs should include a short problem statement, the approach taken, and exact veri
 ## Security & Configuration Tips
 
 Do not commit SQLite databases, mailbox exports, tokens, proxies, or log artifacts. Treat `OPENAI_E2E_DB_PATH`, local `data/`, `secrets/`, and `logs/` contents as sensitive runtime material.
+
+## Private/Public Workflow
+
+This repository now has two roles:
+
+- the current root repository is the private source of truth for day-to-day development
+- the public GitHub repository is a sanitized mirror and must not receive the private local history directly
+
+Recommended workflow:
+
+- Do normal feature work in this private repository first.
+- Verify local changes here with `uv run pytest`, `uv run ruff check .`, and `uv run ty check`.
+- Treat `.worktrees/public-release-sanitized/` as public-release staging only, not as the main development branch.
+- Before updating the public GitHub repo, copy the intended tree into the sanitized staging area, remove or replace secrets, private emails, realistic account samples, and local-only paths, then verify again there.
+- Publish the public repo from a clean sanitized tree with a public-safe git identity such as the GitHub no-reply address.
+- Never push this private repository's `master` or feature branches directly to the public GitHub repository.
+
+Release checklist for the public mirror:
+
+- confirm `.env`, `data/`, `secrets/`, `logs/`, SQLite files, tokens, and proxies are excluded
+- confirm public docs and examples do not contain private credentials or realistic account samples
+- run verification in the sanitized tree
+- re-check the published remote `master` after push

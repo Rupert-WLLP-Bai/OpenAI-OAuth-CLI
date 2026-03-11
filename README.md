@@ -1,5 +1,7 @@
 # OpenAI OAuth CLI
 
+Chinese README: [README.zh-CN.md](README.zh-CN.md)
+
 Python CLIs for:
 
 - automating the OpenAI web login flow and printing the resulting `refresh_token`

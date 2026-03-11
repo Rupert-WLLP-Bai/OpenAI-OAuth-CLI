@@ -71,3 +71,30 @@ Runtime flow is: load account/mailbox data from SQLite, start a localhost callba
 ## Sensitive local data
 
 Treat `data/`, `secrets/`, `logs/`, SQLite DBs, mailbox exports, tokens, and proxy values as sensitive local runtime material. Do not commit them.
+
+## Private/Public Workflow
+
+This repository is the private development source of truth. The public GitHub repository is a sanitized mirror and should be updated through a separate release flow, not by directly pushing the private branch history.
+
+Recommended route:
+
+1. Develop and debug in this private repository.
+2. Run local verification here first:
+   - `uv run pytest`
+   - `uv run ruff check .`
+   - `uv run ty check`
+3. Stage the public update in `.worktrees/public-release-sanitized/`.
+4. In that staging tree, remove or replace anything that should not become public:
+   - passwords and secrets
+   - private email addresses
+   - realistic mailbox/account samples
+   - local-only file names and paths
+5. Verify again in the sanitized tree.
+6. Publish the public repo from a clean sanitized tree using a public-safe author identity such as the GitHub no-reply email.
+7. After push, independently verify the remote `master` branch, latest commit author, and obvious sensitive-string scans.
+
+Hard rules:
+
+- Do not push the private root repository's `master` directly to the public GitHub repo.
+- Do not treat the public staging worktree as the primary place for experimental development.
+- Keep local runtime secrets in ignored files only.
