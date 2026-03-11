@@ -1,0 +1,12 @@
+.venv/
+.env
+.worktrees/
+__pycache__/
+.pytest_cache/
+*.pyc
+dist/
+build/
+secrets/
+archive/
+data/
+logs/
