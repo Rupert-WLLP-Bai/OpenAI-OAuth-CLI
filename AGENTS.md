@@ -58,10 +58,43 @@ Recommended workflow:
 
 - Do normal feature work in this private repository first.
 - Verify local changes here with `uv run pytest`, `uv run ruff check .`, and `uv run ty check`.
+- Merge the finished private work back to the root repository's `master` before preparing the public mirror.
 - Treat `.worktrees/public-release-sanitized/` as public-release staging only, not as the main development branch.
 - Before updating the public GitHub repo, copy the intended tree into the sanitized staging area, remove or replace secrets, private emails, realistic account samples, and local-only paths, then verify again there.
 - Publish the public repo from a clean sanitized tree with a public-safe git identity such as the GitHub no-reply address.
 - Never push this private repository's `master` or feature branches directly to the public GitHub repository.
+
+Recommended public mirror commands:
+
+```bash
+# 1. Sync the private root tree into the sanitized public worktree.
+# IMPORTANT: exclude the worktree .git file and private/runtime material.
+rsync -a --delete \
+  --exclude '.git' \
+  --exclude '.worktrees/' \
+  --exclude '.claude/' \
+  --exclude '.venv/' \
+  --exclude '.pytest_cache/' \
+  --exclude '__pycache__/' \
+  --exclude 'data/' \
+  --exclude 'secrets/' \
+  --exclude 'logs/' \
+  --exclude '*.sqlite3' \
+  <private-repo-root>/ \
+  <private-repo-root>/.worktrees/public-release-sanitized/
+
+# 2. Verify, commit with the public-safe identity, then push the sanitized branch.
+cd <private-repo-root>/.worktrees/public-release-sanitized
+uv sync --group dev
+uv run pytest
+uv run ruff check .
+uv run ty check
+git add -A
+git -c user.name='Rupert-WLLP-Bai' \
+    -c user.email='Rupert-WLLP-Bai@users.noreply.github.com' \
+    commit -m 'chore: update sanitized public release'
+git push public public-master:master
+```
 
 Release checklist for the public mirror:
 
@@ -69,3 +102,10 @@ Release checklist for the public mirror:
 - confirm public docs and examples do not contain private credentials or realistic account samples
 - run verification in the sanitized tree
 - re-check the published remote `master` after push
+- confirm `git status --short --branch` in `.worktrees/public-release-sanitized/` is clean after push
+
+Temporary worktree cleanup:
+
+- remove short-lived development worktrees after their changes are merged
+- keep `.worktrees/public-release-sanitized/` in place as the long-lived public release staging tree
+- if a temporary worktree still has uncommitted changes, inspect it before removal instead of deleting it blindly

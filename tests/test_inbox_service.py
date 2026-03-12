@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import pytest
 
@@ -28,6 +28,7 @@ def test_fetch_inbox_reads_account_from_sqlite_and_normalizes_messages(
     tmp_path: Path,
 ) -> None:
     store = _create_store_with_account(tmp_path)
+    captured: dict[str, object] = {}
 
     class StubProvider:
         def __init__(self, *, proxy: str | None = None) -> None:
@@ -40,24 +41,36 @@ def test_fetch_inbox_reads_account_from_sqlite_and_normalizes_messages(
                     "subject": "OpenAI verification code",
                     "from_address": "noreply@openai.com",
                     "received_at": "2026-03-11T00:00:00+00:00",
-                    "body_html": "<div>Hello <b>World</b><script>alert(1)</script></div>",
+                    "body_html": "<div>Your verification code is <b>123456</b><script>alert(1)</script></div>",
                     "body_preview": "ignored preview",
                 }
             ]
 
-    monkeypatch.setattr(inbox_service, "Wyx66Provider", StubProvider)
+    def fake_create_mail_provider(
+        account: object,
+        *,
+        provider_choice: str = "auto",
+        proxy: str | None = None,
+    ) -> StubProvider:
+        captured["provider_choice"] = provider_choice
+        captured["provider_proxy"] = proxy
+        return StubProvider(proxy=proxy)
+
+    monkeypatch.setattr(inbox_service, "create_mail_provider", fake_create_mail_provider, raising=False)
 
     service = inbox_service.InboxService(store)
-    payload = cast(dict[str, Any], asyncio.run(service.fetch_inbox("user@example.com")))
-    account_payload = cast(dict[str, Any], payload["account"])
-    messages = cast(list[dict[str, str]], payload["messages"])
+    payload = asyncio.run(service.fetch_inbox("user@example.com"))
+    account = cast(dict[str, object], payload["account"])
+    messages = cast(list[inbox_service.InboxMessage], payload["messages"])
 
-    assert account_payload["email"] == "user@example.com"
-    assert account_payload["group_name"] == "group-a"
+    assert captured["provider_choice"] == "auto"
+    assert account["email"] == "user@example.com"
+    assert account["group_name"] == "group-a"
     assert messages[0]["id"] == "message-1"
     assert messages[0]["subject"] == "OpenAI verification code"
     assert messages[0]["from_address"] == "noreply@openai.com"
-    assert messages[0]["body_text"] == "Hello World"
+    assert messages[0]["body_text"] == "Your verification code is 123456"
+    assert messages[0]["verification_code"] == "123456"
     assert "<script" not in messages[0]["body_text"]
     assert "body_html" not in messages[0]
 
@@ -75,13 +88,17 @@ def test_fetch_inbox_handles_missing_optional_message_fields(
         async def fetch_messages(self, session: object, account: object) -> list[dict[str, str]]:
             return [{"id": "message-2"}]
 
-    monkeypatch.setattr(inbox_service, "Wyx66Provider", StubProvider)
+    monkeypatch.setattr(
+        inbox_service,
+        "create_mail_provider",
+        lambda account, *, provider_choice="auto", proxy=None: StubProvider(proxy=proxy),
+        raising=False,
+    )
 
     service = inbox_service.InboxService(store)
-    payload = cast(dict[str, Any], asyncio.run(service.fetch_inbox("user@example.com")))
-    messages = cast(list[dict[str, str]], payload["messages"])
+    payload = asyncio.run(service.fetch_inbox("user@example.com"))
 
-    assert messages == [
+    assert payload["messages"] == [
         {
             "id": "message-2",
             "subject": "",
@@ -89,6 +106,7 @@ def test_fetch_inbox_handles_missing_optional_message_fields(
             "received_at": "",
             "body_preview": "",
             "body_text": "",
+            "verification_code": None,
         }
     ]
 
@@ -106,7 +124,12 @@ def test_fetch_inbox_wraps_wyx66_errors(
         async def fetch_messages(self, session: object, account: object) -> list[dict[str, str]]:
             raise RuntimeError("wyx66 request failed with status 500")
 
-    monkeypatch.setattr(inbox_service, "Wyx66Provider", StubProvider)
+    monkeypatch.setattr(
+        inbox_service,
+        "create_mail_provider",
+        lambda account, *, provider_choice="auto", proxy=None: StubProvider(proxy=proxy),
+        raising=False,
+    )
 
     service = inbox_service.InboxService(store)
 

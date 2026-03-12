@@ -6,6 +6,14 @@ from openai_auth_core.oauth_pages import classify_oauth_login_state, summarize_o
 
 from .models import OAuthPageSignals, RegistrationPageSignals, RegistrationState
 
+__all__ = [
+    "classify_oauth_login_state",
+    "classify_registration_state",
+    "extract_oauth_page_signals",
+    "extract_registration_page_signals",
+    "summarize_oauth_error",
+]
+
 if TYPE_CHECKING:
     from patchright.async_api import Page
 
@@ -102,12 +110,3 @@ async def _has_match(page: Page, selector: str) -> bool:
         return await page.locator(selector).count() > 0
     except Exception:
         return False
-
-
-__all__ = [
-    "classify_oauth_login_state",
-    "classify_registration_state",
-    "extract_oauth_page_signals",
-    "extract_registration_page_signals",
-    "summarize_oauth_error",
-]

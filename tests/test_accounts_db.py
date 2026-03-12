@@ -4,7 +4,7 @@ import json
 import re
 import sqlite3
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import pytest
 
@@ -30,6 +30,47 @@ def _execute(db_path: Path, sql: str, params: tuple[object, ...] = ()) -> None:
     with sqlite3.connect(db_path) as connection:
         connection.execute(sql, params)
         connection.commit()
+
+
+def test_resolve_account_update_promotes_registered_when_primary_enabled() -> None:
+    row = {
+        "group_name": "group-a",
+        "is_registered": 0,
+        "is_primary": 0,
+    }
+
+    resolved = accounts_db._resolve_account_update(
+        row,
+        group_name=None,
+        is_registered=None,
+        is_primary=True,
+        updated_at="2026-03-12T00:00:00+00:00",
+    )
+
+    assert resolved.group_name == "group-a"
+    assert resolved.is_registered is True
+    assert resolved.is_primary is True
+    assert resolved.updated_at == "2026-03-12T00:00:00+00:00"
+
+
+def test_resolve_account_update_clears_primary_when_registration_disabled() -> None:
+    row = {
+        "group_name": "group-a",
+        "is_registered": 1,
+        "is_primary": 1,
+    }
+
+    resolved = accounts_db._resolve_account_update(
+        row,
+        group_name="ops",
+        is_registered=False,
+        is_primary=None,
+        updated_at="2026-03-12T00:00:00+00:00",
+    )
+
+    assert resolved.group_name == "ops"
+    assert resolved.is_registered is False
+    assert resolved.is_primary is False
 
 
 def test_init_db_creates_required_tables(tmp_path: Path) -> None:
@@ -146,7 +187,7 @@ def test_find_account_by_email_reads_from_sqlite_store(tmp_path: Path) -> None:
     db_path = tmp_path / "accounts.sqlite3"
     txt_path = tmp_path / "accounts.txt"
     txt_path.write_text(
-        "alpha@example.com----pw----uuid-alpha----rt-alpha----x----Codex Team2\n",
+        "joann@example.com----pw----uuid-joann----rt-joann----x----Codex Team2\n",
         encoding="utf-8",
     )
 
@@ -154,14 +195,31 @@ def test_find_account_by_email_reads_from_sqlite_store(tmp_path: Path) -> None:
     store.init_db()
     store.import_txt_file(txt_path)
 
-    account = store.find_account_by_email("  ALPHA@example.com  ")
+    account = store.find_account_by_email("  JOANN@EXAMPLE.COM  ")
 
-    assert account.email == "alpha@example.com"
-    assert account.mail_client_id == "uuid-alpha"
-    assert account.mail_refresh_token == "rt-alpha"
+    assert account.email == "joann@example.com"
+    assert account.mail_client_id == "uuid-joann"
+    assert account.mail_refresh_token == "rt-joann"
     assert account.group == "Codex Team2"
     assert account.is_registered is False
     assert account.is_primary is False
+
+
+def test_get_account_email_by_id_returns_email(tmp_path: Path) -> None:
+    db_path = tmp_path / "accounts.sqlite3"
+    txt_path = tmp_path / "accounts.txt"
+    txt_path.write_text(
+        "user@example.com----pw----uuid-user----rt-user----x----group-a\n",
+        encoding="utf-8",
+    )
+
+    store = AccountStore(db_path)
+    store.init_db()
+    store.import_txt_file(txt_path)
+
+    account_id = int(_fetch_one(db_path, "SELECT id FROM accounts WHERE lower(email) = lower(?)", ("user@example.com",))["id"])
+
+    assert store.get_account_email_by_id(account_id) == "user@example.com"
 
 
 def test_import_txt_file_skips_rows_with_blank_required_fields(tmp_path: Path) -> None:
@@ -240,11 +298,11 @@ def test_import_txt_file_inserts_new_accounts_with_sqlite_state_defaults(
     txt_path.write_text(
         "\n".join(
             [
-                "alpha@example.com----pw----uuid-alpha----rt-alpha----x----gpt team 1",
-                "bravo@example.com----pw----uuid-bravo----rt-bravo----x----Codex Team2",
-                "charlie@example.com----pw----uuid-charlie----rt-charlie----x----gpt team 1",
-                "delta@example.com----pw----uuid-delta----rt-delta----x----Codex Team2",
-                "echo@example.com----pw----uuid-echo----rt-echo----x----默认分组",
+                "drake@example.com----pw----uuid-drake----rt-drake----x----gpt team 1",
+                "joann@example.com----pw----uuid-joann----rt-joann----x----Codex Team2",
+                "patience@example.com----pw----uuid-patience----rt-patience----x----gpt team 1",
+                "kyler@example.com----pw----uuid-kyler----rt-kyler----x----Codex Team2",
+                "garrett@example.com----pw----uuid-garrett----rt-garrett----x----默认分组",
             ]
         )
         + "\n",
@@ -264,11 +322,11 @@ def test_import_txt_file_inserts_new_accounts_with_sqlite_state_defaults(
         for row in rows
     }
 
-    assert status_by_email["alpha@example.com"] == (0, 0)
-    assert status_by_email["bravo@example.com"] == (0, 0)
-    assert status_by_email["charlie@example.com"] == (0, 0)
-    assert status_by_email["delta@example.com"] == (0, 0)
-    assert status_by_email["echo@example.com"] == (0, 0)
+    assert status_by_email["drake@example.com"] == (0, 0)
+    assert status_by_email["joann@example.com"] == (0, 0)
+    assert status_by_email["patience@example.com"] == (0, 0)
+    assert status_by_email["kyler@example.com"] == (0, 0)
+    assert status_by_email["garrett@example.com"] == (0, 0)
 
 
 def test_import_txt_file_does_not_derive_state_from_group_name(tmp_path: Path) -> None:
@@ -277,8 +335,8 @@ def test_import_txt_file_does_not_derive_state_from_group_name(tmp_path: Path) -
     txt_path.write_text(
         "\n".join(
             [
-                "foxtrot@example.com----pw----uuid-foxtrot----rt-foxtrot----x----gpt team 1",
-                "grouped-user@example.com----pw----uuid-grouped-user----rt-grouped-user----x----gpt team 1",
+                "sofia@example.com----pw----uuid-sofia----rt-sofia----x----gpt team 1",
+                "brand-new@example.com----pw----uuid-brand-new----rt-brand-new----x----gpt team 1",
             ]
         )
         + "\n",
@@ -298,8 +356,8 @@ def test_import_txt_file_does_not_derive_state_from_group_name(tmp_path: Path) -
         for row in rows
     }
 
-    assert status_by_email["foxtrot@example.com"] == (0, 0)
-    assert status_by_email["grouped-user@example.com"] == (0, 0)
+    assert status_by_email["sofia@example.com"] == (0, 0)
+    assert status_by_email["brand-new@example.com"] == (0, 0)
 
 
 def test_import_txt_file_does_not_reseed_user_managed_flags_after_first_insert(tmp_path: Path) -> None:
@@ -309,9 +367,9 @@ def test_import_txt_file_does_not_reseed_user_managed_flags_after_first_insert(t
     first_path.write_text(
         "\n".join(
             [
-                "alpha@example.com----pw----uuid-alpha-1----rt-alpha-1----x----Codex Team2",
-                "bravo@example.com----pw----uuid-bravo-1----rt-bravo-1----x----gpt team 1",
-                "charlie@example.com----pw----uuid-charlie-1----rt-charlie-1----x----默认分组",
+                "joann@example.com----pw----uuid-joann-1----rt-joann-1----x----Codex Team2",
+                "patience@example.com----pw----uuid-patience-1----rt-patience-1----x----gpt team 1",
+                "garrett@example.com----pw----uuid-garrett-1----rt-garrett-1----x----默认分组",
             ]
         )
         + "\n",
@@ -320,10 +378,10 @@ def test_import_txt_file_does_not_reseed_user_managed_flags_after_first_insert(t
     second_path.write_text(
         "\n".join(
             [
-                "alpha@example.com----pw----uuid-alpha-2----rt-alpha-2----x----Codex Team2",
-                "bravo@example.com----pw----uuid-bravo-2----rt-bravo-2----x----gpt team 1",
-                "charlie@example.com----pw----uuid-charlie-2----rt-charlie-2----x----默认分组",
-                "delta@example.com----pw----uuid-delta-2----rt-delta-2----x----gpt team 1",
+                "joann@example.com----pw----uuid-joann-2----rt-joann-2----x----Codex Team2",
+                "patience@example.com----pw----uuid-patience-2----rt-patience-2----x----gpt team 1",
+                "garrett@example.com----pw----uuid-garrett-2----rt-garrett-2----x----默认分组",
+                "sofia@example.com----pw----uuid-sofia-2----rt-sofia-2----x----gpt team 1",
             ]
         )
         + "\n",
@@ -341,7 +399,7 @@ def test_import_txt_file_does_not_reseed_user_managed_flags_after_first_insert(t
         SET is_registered = ?, is_primary = ?
         WHERE lower(email) = lower(?)
         """,
-        (1, 0, "alpha@example.com"),
+        (1, 0, "joann@example.com"),
     )
     _execute(
         db_path,
@@ -350,7 +408,7 @@ def test_import_txt_file_does_not_reseed_user_managed_flags_after_first_insert(t
         SET is_registered = ?, is_primary = ?
         WHERE lower(email) = lower(?)
         """,
-        (0, 0, "bravo@example.com"),
+        (0, 0, "patience@example.com"),
     )
     _execute(
         db_path,
@@ -359,7 +417,7 @@ def test_import_txt_file_does_not_reseed_user_managed_flags_after_first_insert(t
         SET is_registered = ?, is_primary = ?
         WHERE lower(email) = lower(?)
         """,
-        (1, 0, "charlie@example.com"),
+        (1, 0, "garrett@example.com"),
     )
 
     store.import_txt_file(second_path)
@@ -374,32 +432,32 @@ def test_import_txt_file_does_not_reseed_user_managed_flags_after_first_insert(t
     )
     accounts_by_email = {str(row["email"]).strip().casefold(): row for row in rows}
 
-    assert accounts_by_email["alpha@example.com"]["mail_client_id"] == "uuid-alpha-2"
-    assert accounts_by_email["alpha@example.com"]["mail_refresh_token"] == "rt-alpha-2"
+    assert accounts_by_email["joann@example.com"]["mail_client_id"] == "uuid-joann-2"
+    assert accounts_by_email["joann@example.com"]["mail_refresh_token"] == "rt-joann-2"
     assert (
-        accounts_by_email["alpha@example.com"]["is_registered"],
-        accounts_by_email["alpha@example.com"]["is_primary"],
+        accounts_by_email["joann@example.com"]["is_registered"],
+        accounts_by_email["joann@example.com"]["is_primary"],
     ) == (1, 0)
 
-    assert accounts_by_email["bravo@example.com"]["mail_client_id"] == "uuid-bravo-2"
-    assert accounts_by_email["bravo@example.com"]["mail_refresh_token"] == "rt-bravo-2"
+    assert accounts_by_email["patience@example.com"]["mail_client_id"] == "uuid-patience-2"
+    assert accounts_by_email["patience@example.com"]["mail_refresh_token"] == "rt-patience-2"
     assert (
-        accounts_by_email["bravo@example.com"]["is_registered"],
-        accounts_by_email["bravo@example.com"]["is_primary"],
+        accounts_by_email["patience@example.com"]["is_registered"],
+        accounts_by_email["patience@example.com"]["is_primary"],
     ) == (0, 0)
 
-    assert accounts_by_email["charlie@example.com"]["mail_client_id"] == "uuid-charlie-2"
-    assert accounts_by_email["charlie@example.com"]["mail_refresh_token"] == "rt-charlie-2"
+    assert accounts_by_email["garrett@example.com"]["mail_client_id"] == "uuid-garrett-2"
+    assert accounts_by_email["garrett@example.com"]["mail_refresh_token"] == "rt-garrett-2"
     assert (
-        accounts_by_email["charlie@example.com"]["is_registered"],
-        accounts_by_email["charlie@example.com"]["is_primary"],
+        accounts_by_email["garrett@example.com"]["is_registered"],
+        accounts_by_email["garrett@example.com"]["is_primary"],
     ) == (1, 0)
 
-    assert accounts_by_email["delta@example.com"]["mail_client_id"] == "uuid-delta-2"
-    assert accounts_by_email["delta@example.com"]["mail_refresh_token"] == "rt-delta-2"
+    assert accounts_by_email["sofia@example.com"]["mail_client_id"] == "uuid-sofia-2"
+    assert accounts_by_email["sofia@example.com"]["mail_refresh_token"] == "rt-sofia-2"
     assert (
-        accounts_by_email["delta@example.com"]["is_registered"],
-        accounts_by_email["delta@example.com"]["is_primary"],
+        accounts_by_email["sofia@example.com"]["is_registered"],
+        accounts_by_email["sofia@example.com"]["is_primary"],
     ) == (0, 0)
 
 
@@ -522,8 +580,8 @@ def test_list_accounts_filters_and_pages_results(tmp_path: Path) -> None:
     )
 
     assert hasattr(store, "list_accounts")
-    page = cast(dict[str, Any], store.list_accounts(query="a", group_name="group-a", is_registered=True, limit=1, offset=0))
-    items = cast(list[dict[str, Any]], page["items"])
+    page = store.list_accounts(query="a", group_name="group-a", is_registered=True, limit=1, offset=0)
+    items = cast(list[dict[str, object]], page["items"])
 
     assert page["total"] == 1
     assert page["limit"] == 1
@@ -600,6 +658,61 @@ def test_bulk_update_accounts_updates_target_rows_only(tmp_path: Path) -> None:
     ]
 
 
+def test_bulk_update_accounts_uses_one_timestamp_for_the_batch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "accounts.sqlite3"
+    txt_path = tmp_path / "accounts.txt"
+    txt_path.write_text(
+        "\n".join(
+            [
+                "first@example.com----pw----uuid-first----rt-first----x----default",
+                "second@example.com----pw----uuid-second----rt-second----x----default",
+                "third@example.com----pw----uuid-third----rt-third----x----default",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    store = AccountStore(db_path)
+    store.init_db()
+    store.import_txt_file(txt_path)
+
+    timestamps = iter(
+        [
+            "2026-03-12T10:00:00+00:00",
+            "2026-03-12T10:00:01+00:00",
+            "2026-03-12T10:00:02+00:00",
+        ]
+    )
+    monkeypatch.setattr(accounts_db, "_utcnow", lambda: next(timestamps))
+
+    updated_count = store.bulk_update_accounts(
+        emails=["first@example.com", "third@example.com"],
+        group_name="batch-group",
+        is_registered=True,
+    )
+
+    rows = _fetch_all(
+        db_path,
+        """
+        SELECT email, updated_at
+        FROM accounts
+        WHERE lower(email) IN (lower(?), lower(?))
+        ORDER BY lower(email)
+        """,
+        ("first@example.com", "third@example.com"),
+    )
+
+    assert updated_count == 2
+    assert [row["updated_at"] for row in rows] == [
+        "2026-03-12T10:00:00+00:00",
+        "2026-03-12T10:00:00+00:00",
+    ]
+
+
 def test_bulk_update_accounts_is_atomic_when_one_email_is_missing(tmp_path: Path) -> None:
     db_path = tmp_path / "accounts.sqlite3"
     txt_path = tmp_path / "accounts.txt"
@@ -633,6 +746,42 @@ def test_bulk_update_accounts_is_atomic_when_one_email_is_missing(tmp_path: Path
     assert [(row["email"], row["group_name"], row["is_registered"], row["is_primary"]) for row in rows] == [
         ("first@example.com", "default", 0, 0),
         ("second@example.com", "default", 0, 0),
+    ]
+
+
+def test_bulk_update_accounts_deduplicates_normalized_emails(tmp_path: Path) -> None:
+    db_path = tmp_path / "accounts.sqlite3"
+    txt_path = tmp_path / "accounts.txt"
+    txt_path.write_text(
+        "\n".join(
+            [
+                "first@example.com----pw----uuid-first----rt-first----x----default",
+                "second@example.com----pw----uuid-second----rt-second----x----default",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    store = AccountStore(db_path)
+    store.init_db()
+    store.import_txt_file(txt_path)
+
+    updated_count = store.bulk_update_accounts(
+        emails=[" First@Example.com ", "first@example.com", "SECOND@example.com"],
+        group_name="batch-group",
+        is_primary=True,
+    )
+
+    rows = _fetch_all(
+        db_path,
+        "SELECT email, group_name, is_registered, is_primary FROM accounts ORDER BY lower(email)",
+    )
+
+    assert updated_count == 2
+    assert [(row["email"], row["group_name"], row["is_registered"], row["is_primary"]) for row in rows] == [
+        ("first@example.com", "batch-group", 1, 1),
+        ("second@example.com", "batch-group", 1, 1),
     ]
 
 

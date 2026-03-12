@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
@@ -28,6 +29,14 @@ class ImportTextSource:
     text: str
 
 
+@dataclass(frozen=True)
+class _ResolvedAccountUpdate:
+    group_name: str
+    is_registered: bool
+    is_primary: bool
+    updated_at: str
+
+
 def _utcnow() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
@@ -40,6 +49,33 @@ def _should_import_account(account: AccountRecord) -> bool:
     if not account.mail_refresh_token.strip():
         return False
     return True
+
+
+def _resolve_account_update(
+    row: Mapping[str, object],
+    *,
+    group_name: str | None = None,
+    is_registered: bool | None = None,
+    is_primary: bool | None = None,
+    updated_at: str | None = None,
+) -> _ResolvedAccountUpdate:
+    next_group_name = str(row["group_name"]) if group_name is None else group_name
+    next_is_registered = bool(row["is_registered"]) if is_registered is None else is_registered
+    next_is_primary = bool(row["is_primary"]) if is_primary is None else is_primary
+
+    if is_registered is False:
+        next_is_primary = False
+    if is_primary is True:
+        next_is_registered = True
+    if not next_is_registered:
+        next_is_primary = False
+
+    return _ResolvedAccountUpdate(
+        group_name=next_group_name,
+        is_registered=next_is_registered,
+        is_primary=next_is_primary,
+        updated_at=updated_at or _utcnow(),
+    )
 
 
 class AccountStore:
@@ -106,6 +142,17 @@ class AccountStore:
     def tables_exist(self, *table_names: str) -> bool:
         with self._connect() as connection:
             return sqlite_tables_exist(connection, *table_names)
+
+    def get_account_email_by_id(self, account_id: int) -> str:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT email FROM accounts WHERE id = ?",
+                (account_id,),
+            ).fetchone()
+
+        if row is None:
+            raise ValueError(f"account not found for id: {account_id}")
+        return str(row["email"])
 
     def import_txt_file(self, txt_path: Path) -> ImportStats:
         return self.import_txt_files([txt_path])
@@ -291,19 +338,12 @@ class AccountStore:
             ).fetchone()
             if row is None:
                 raise ValueError(f"account not found for email: {email}")
-
-            next_group_name = str(row["group_name"]) if group_name is None else group_name
-            next_is_registered = bool(row["is_registered"]) if is_registered is None else is_registered
-            next_is_primary = bool(row["is_primary"]) if is_primary is None else is_primary
-
-            if is_registered is False:
-                next_is_primary = False
-            if is_primary is True:
-                next_is_registered = True
-            if not next_is_registered:
-                next_is_primary = False
-
-            updated_at = _utcnow()
+            resolved = _resolve_account_update(
+                row,
+                group_name=group_name,
+                is_registered=is_registered,
+                is_primary=is_primary,
+            )
             connection.execute(
                 """
                 UPDATE accounts
@@ -311,20 +351,20 @@ class AccountStore:
                 WHERE email = ? COLLATE NOCASE
                 """,
                 (
-                    next_group_name,
-                    1 if next_is_registered else 0,
-                    1 if next_is_primary else 0,
-                    updated_at,
+                    resolved.group_name,
+                    1 if resolved.is_registered else 0,
+                    1 if resolved.is_primary else 0,
+                    resolved.updated_at,
                     normalized_email,
                 ),
             )
 
         return {
             "email": str(row["email"]),
-            "group_name": next_group_name,
-            "is_registered": next_is_registered,
-            "is_primary": next_is_primary,
-            "updated_at": updated_at,
+            "group_name": resolved.group_name,
+            "is_registered": resolved.is_registered,
+            "is_primary": resolved.is_primary,
+            "updated_at": resolved.updated_at,
         }
 
     def bulk_update_accounts(
@@ -335,51 +375,57 @@ class AccountStore:
         is_registered: bool | None = None,
         is_primary: bool | None = None,
     ) -> int:
-        normalized_emails = [normalize_email(email) for email in emails]
+        normalized_emails = list(dict.fromkeys(normalize_email(email) for email in emails))
         if not normalized_emails:
             return 0
 
-        updated_count = 0
+        placeholders = ", ".join("?" for _ in normalized_emails)
+        updated_at = _utcnow()
         with self._connect() as connection:
-            for normalized_email in normalized_emails:
-                row = connection.execute(
-                    """
-                    SELECT email, group_name, is_registered, is_primary
-                    FROM accounts
-                    WHERE email = ? COLLATE NOCASE
-                    """,
-                    (normalized_email,),
-                ).fetchone()
-                if row is None:
-                    raise ValueError(f"account not found for email: {normalized_email}")
+            rows = connection.execute(
+                f"""
+                SELECT email, group_name, is_registered, is_primary
+                FROM accounts
+                WHERE lower(email) IN ({placeholders})
+                """,
+                tuple(normalized_emails),
+            ).fetchall()
 
-                next_group_name = str(row["group_name"]) if group_name is None else group_name
-                next_is_registered = bool(row["is_registered"]) if is_registered is None else is_registered
-                next_is_primary = bool(row["is_primary"]) if is_primary is None else is_primary
+            rows_by_email = {normalize_email(str(row["email"])): row for row in rows}
+            missing = [email for email in normalized_emails if email not in rows_by_email]
+            if missing:
+                raise ValueError(f"account not found for email: {missing[0]}")
 
-                if is_registered is False:
-                    next_is_primary = False
-                if is_primary is True:
-                    next_is_registered = True
-                if not next_is_registered:
-                    next_is_primary = False
-
-                connection.execute(
-                    """
-                    UPDATE accounts
-                    SET group_name = ?, is_registered = ?, is_primary = ?, updated_at = ?
-                    WHERE email = ? COLLATE NOCASE
-                    """,
-                    (
-                        next_group_name,
-                        1 if next_is_registered else 0,
-                        1 if next_is_primary else 0,
-                        _utcnow(),
-                        normalized_email,
-                    ),
+            resolved_updates = [
+                _resolve_account_update(
+                    rows_by_email[normalized_email],
+                    group_name=group_name,
+                    is_registered=is_registered,
+                    is_primary=is_primary,
+                    updated_at=updated_at,
                 )
-                updated_count += 1
-        return updated_count
+                for normalized_email in normalized_emails
+            ]
+
+            connection.executemany(
+                """
+                UPDATE accounts
+                SET group_name = ?, is_registered = ?, is_primary = ?, updated_at = ?
+                WHERE email = ? COLLATE NOCASE
+                """,
+                [
+                    (
+                        resolved.group_name,
+                        1 if resolved.is_registered else 0,
+                        1 if resolved.is_primary else 0,
+                        resolved.updated_at,
+                        str(rows_by_email[normalized_email]["email"]),
+                    )
+                    for normalized_email, resolved in zip(normalized_emails, resolved_updates, strict=True)
+                ],
+            )
+
+        return len(resolved_updates)
 
     def get_summary(self) -> dict[str, object]:
         with self._connect() as connection:

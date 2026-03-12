@@ -83,18 +83,48 @@ Recommended route:
    - `uv run pytest`
    - `uv run ruff check .`
    - `uv run ty check`
-3. Stage the public update in `.worktrees/public-release-sanitized/`.
-4. In that staging tree, remove or replace anything that should not become public:
+3. Merge the finished private work back into the root repository's `master`.
+4. Stage the public update in `.worktrees/public-release-sanitized/`.
+5. Sync the private root tree into that staging tree. If you use `rsync`, always exclude the worktree `.git` file and private/runtime material:
+   ```bash
+   rsync -a --delete \
+     --exclude '.git' \
+     --exclude '.worktrees/' \
+     --exclude '.claude/' \
+     --exclude '.venv/' \
+     --exclude '.pytest_cache/' \
+     --exclude '__pycache__/' \
+     --exclude 'data/' \
+     --exclude 'secrets/' \
+     --exclude 'logs/' \
+     --exclude '*.sqlite3' \
+     <private-repo-root>/ \
+     <private-repo-root>/.worktrees/public-release-sanitized/
+   ```
+6. In that staging tree, remove or replace anything that should not become public:
    - passwords and secrets
    - private email addresses
    - realistic mailbox/account samples
    - local-only file names and paths
-5. Verify again in the sanitized tree.
-6. Publish the public repo from a clean sanitized tree using a public-safe author identity such as the GitHub no-reply email.
-7. After push, independently verify the remote `master` branch, latest commit author, and obvious sensitive-string scans.
+7. Verify again in the sanitized tree:
+   - `uv run pytest`
+   - `uv run ruff check .`
+   - `uv run ty check`
+8. Publish the public repo from a clean sanitized tree using a public-safe author identity such as the GitHub no-reply email:
+   ```bash
+   cd <private-repo-root>/.worktrees/public-release-sanitized
+   git add -A
+   git -c user.name='Rupert-WLLP-Bai' \
+       -c user.email='Rupert-WLLP-Bai@users.noreply.github.com' \
+       commit -m 'chore: update sanitized public release'
+   git push public public-master:master
+   ```
+9. After push, independently verify the remote `master` branch, latest commit author, and obvious sensitive-string scans.
 
 Hard rules:
 
 - Do not push the private root repository's `master` directly to the public GitHub repo.
 - Do not treat the public staging worktree as the primary place for experimental development.
 - Keep local runtime secrets in ignored files only.
+- Keep `.worktrees/public-release-sanitized/` as the only long-lived public release worktree.
+- Remove short-lived feature or parallel worktrees after their changes are merged. If a worktree is dirty, inspect it before removing it.

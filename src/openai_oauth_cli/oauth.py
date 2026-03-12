@@ -11,6 +11,15 @@ from openai_auth_core.oauth import parse_callback_url as _parse_callback_url
 
 from .models import TokenBundle
 
+__all__ = [
+    "build_auth_url",
+    "build_callback_url",
+    "build_token_exchange_payload",
+    "exchange_code_for_tokens",
+    "make_pkce_material",
+    "parse_callback_url",
+]
+
 
 def parse_callback_url(callback_url: str, *, expected_state: str) -> str:
     try:
@@ -37,13 +46,3 @@ async def exchange_code_for_tokens(
         access_token=bundle.access_token,
         id_token=bundle.id_token,
     )
-
-
-__all__ = [
-    "build_auth_url",
-    "build_callback_url",
-    "build_token_exchange_payload",
-    "exchange_code_for_tokens",
-    "make_pkce_material",
-    "parse_callback_url",
-]

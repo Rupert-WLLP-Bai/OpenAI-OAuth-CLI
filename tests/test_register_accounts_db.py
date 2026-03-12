@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, cast
 
 import pytest
 
@@ -116,28 +116,9 @@ def test_get_account_uses_index_friendly_lookup(monkeypatch: pytest.MonkeyPatch,
             executed_sql.append(" ".join(sql.split()))
             return super().execute(sql, parameters)
 
-    def connect(
-        path: str | Path,
-        timeout: float = 5.0,
-        detect_types: int = 0,
-        isolation_level: Literal["DEFERRED", "EXCLUSIVE", "IMMEDIATE"] | None = "DEFERRED",
-        check_same_thread: bool = True,
-        cached_statements: int = 128,
-        uri: bool = False,
-        *,
-        autocommit: bool = False,
-    ) -> sqlite3.Connection:
-        return real_connect(
-            path,
-            timeout=timeout,
-            detect_types=detect_types,
-            isolation_level=isolation_level,
-            check_same_thread=check_same_thread,
-            factory=RecordingConnection,
-            cached_statements=cached_statements,
-            uri=uri,
-            autocommit=autocommit,
-        )
+    def connect(path: str | Path, *args: Any, **kwargs: Any) -> sqlite3.Connection:
+        kwargs.setdefault("factory", RecordingConnection)
+        return cast(sqlite3.Connection, real_connect(path, *args, **kwargs))
 
     monkeypatch.setattr(register_accounts_db.sqlite3, "connect", connect)
 

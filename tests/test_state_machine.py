@@ -132,7 +132,7 @@ def test_state_machine_passes_remaining_timeout_to_code_provider(monkeypatch: py
             observed.append(timeout)
             return "123456"
 
-    monkeypatch.setattr("openai_oauth_cli.state_machine.asyncio.get_running_loop", lambda: loop)
+    monkeypatch.setattr("openai_auth_core.flow.asyncio.get_running_loop", lambda: loop)
 
     browser = FakeBrowser(states=["email", "verification_code", "callback"])
     account = AccountRecord(email="a@example.com", mail_client_id="uuid", mail_refresh_token="rt", group="g")
@@ -151,8 +151,8 @@ def test_state_machine_sleeps_while_waiting_for_transition(monkeypatch: pytest.M
     async def fake_sleep(delay: float) -> None:
         sleep_calls.append(delay)
 
-    monkeypatch.setattr("openai_oauth_cli.state_machine.asyncio.get_running_loop", lambda: loop)
-    monkeypatch.setattr("openai_oauth_cli.state_machine.asyncio.sleep", fake_sleep)
+    monkeypatch.setattr("openai_auth_core.flow.asyncio.get_running_loop", lambda: loop)
+    monkeypatch.setattr("openai_auth_core.flow.asyncio.sleep", fake_sleep)
 
     browser = FakeBrowser(states=["email", "email"])
     account = AccountRecord(email="a@example.com", mail_client_id="uuid", mail_refresh_token="rt", group="g")
@@ -162,3 +162,27 @@ def test_state_machine_sleeps_while_waiting_for_transition(monkeypatch: pytest.M
         asyncio.run(machine.complete_login(account=account, email="a@example.com", password="pw", timeout=5))
 
     assert sleep_calls == [0.1]
+
+
+def test_state_machine_delegates_to_shared_oauth_runner(monkeypatch: pytest.MonkeyPatch) -> None:
+    browser = FakeBrowser(states=["email"])
+    provider = FakeCodeProvider()
+    account = AccountRecord(email="a@example.com", mail_client_id="uuid", mail_refresh_token="rt", group="g")
+    machine = LoginStateMachine(browser=browser, code_provider=provider)
+    captured: dict[str, object] = {}
+
+    async def fake_run_oauth_login_flow(**kwargs: object) -> str:
+        captured.update(kwargs)
+        return "callback"
+
+    monkeypatch.setattr("openai_oauth_cli.state_machine.run_oauth_login_flow", fake_run_oauth_login_flow, raising=False)
+
+    result = asyncio.run(machine.complete_login(account=account, email="a@example.com", password="pw", timeout=5))
+
+    assert result == "callback"
+    assert captured["browser"] is browser
+    assert captured["code_provider"] is provider
+    assert captured["account"] is account
+    assert captured["email"] == "a@example.com"
+    assert captured["password"] == "pw"
+    assert captured["timeout"] == 5

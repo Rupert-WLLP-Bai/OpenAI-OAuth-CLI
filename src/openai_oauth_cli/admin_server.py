@@ -84,14 +84,10 @@ class LocalAccountAdminServer:
         return web.json_response(payload, status=status)
 
     def _lookup_account_email(self, account_id: int) -> str:
-        with self._store._connect() as connection:
-            row = connection.execute(
-                "SELECT email FROM accounts WHERE id = ?",
-                (account_id,),
-            ).fetchone()
-        if row is None:
+        try:
+            return self._store.get_account_email_by_id(account_id)
+        except ValueError:
             raise web.HTTPNotFound(text='{"error":"account not found"}', content_type="application/json")
-        return str(row["email"])
 
     async def _handle_root(self, request: web.Request) -> web.Response:
         del request
@@ -104,8 +100,8 @@ class LocalAccountAdminServer:
     async def _handle_groups(self, request: web.Request) -> web.Response:
         del request
         summary = self._store.get_summary()
-        group_counts = cast(dict[str, object], summary["groups"])
-        groups = sorted(str(group_name) for group_name in group_counts.keys())
+        groups_by_name = cast(dict[str, int], summary["groups"])
+        groups = sorted(str(group_name) for group_name in groups_by_name.keys())
         return self._json(groups)
 
     async def _handle_list_accounts(self, request: web.Request) -> web.Response:

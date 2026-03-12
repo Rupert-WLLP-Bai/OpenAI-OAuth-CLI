@@ -4,6 +4,13 @@ import asyncio
 from datetime import date
 from typing import Any, TYPE_CHECKING, cast
 
+from openai_auth_core.browser_actions import (
+    click_first_continue_button,
+    open_authorization_page as open_shared_authorization_page,
+    submit_email_input,
+    submit_password_input,
+    submit_verification_code_input,
+)
 from openai_auth_core.browser_base import start_browser_session, stop_browser_session
 from openai_auth_core.humanize import human_click_locator, human_type_locator
 from .diagnostics import RunLogger
@@ -64,8 +71,7 @@ class PatchrightBrowser:
 
     async def open_authorization_page(self, auth_url: str) -> None:
         assert self.page is not None
-        await self.page.goto(auth_url, wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT_MS)
-        await asyncio.sleep(2)
+        await open_shared_authorization_page(self.page, auth_url, timeout_ms=PAGE_LOAD_TIMEOUT_MS)
         self._log_event("navigation", flow="verify-login", url=self.page.url)
 
     async def current_state(self) -> RegistrationState:
@@ -86,12 +92,9 @@ class PatchrightBrowser:
             return "error"
         signals = await extract_oauth_page_signals(self.page)
         self._last_oauth_signals = signals
-        state = cast(
-            OAuthLoginState,
-            classify_oauth_login_state(signals, callback_url=callback_url, callback_done=callback_done),
-        )
+        state = classify_oauth_login_state(signals, callback_url=callback_url, callback_done=callback_done)
         self._log_event("page_state", flow="verify-login", state=state, signals=signals)
-        return state
+        return cast(OAuthLoginState, state)
 
     async def click_signup(self) -> None:
         assert self.page is not None
@@ -107,41 +110,17 @@ class PatchrightBrowser:
     async def submit_email(self, email: str) -> None:
         assert self.page is not None
         self._log_event("action", flow="auth", action="submit_email", email=email)
-        field = await self.page.wait_for_selector(
-            'input[type="email"], input[name="username"]:not([type="hidden"]), input[placeholder*="email" i], input[placeholder*="电子邮件" i]',
-            timeout=10_000,
-        )
-        if field is None:
-            raise RuntimeError("failed to locate the email input")
-        await human_type_locator(page=self.page, locator=field, text=email)
-        await asyncio.sleep(0.5)
-        await self._click_continue()
+        await submit_email_input(self.page, email, continue_cb=self._click_continue)
 
     async def submit_password(self, password: str) -> None:
         assert self.page is not None
         self._log_event("action", flow="auth", action="submit_password", password="<redacted>")
-        field = await self.page.wait_for_selector(
-            'input[type="password"], input[name="password"]',
-            timeout=10_000,
-        )
-        if field is None:
-            raise RuntimeError("failed to locate the password input")
-        await human_type_locator(page=self.page, locator=field, text=password)
-        await asyncio.sleep(0.5)
-        await self._click_continue()
+        await submit_password_input(self.page, password, continue_cb=self._click_continue)
 
     async def submit_verification_code(self, code: str) -> None:
         assert self.page is not None
         self._log_event("action", flow="auth", action="submit_verification_code", code="<redacted>")
-        field = await self.page.wait_for_selector(
-            'input[autocomplete="one-time-code"], input[placeholder*="验证码" i], input[placeholder*="code" i]',
-            timeout=10_000,
-        )
-        if field is None:
-            raise RuntimeError("failed to locate the verification code input")
-        await human_type_locator(page=self.page, locator=field, text=code)
-        await asyncio.sleep(0.5)
-        await self._click_continue()
+        await submit_verification_code_input(self.page, code, continue_cb=self._click_continue)
 
     async def submit_profile(self, full_name: str, birthday: date) -> None:
         assert self.page is not None
@@ -187,15 +166,8 @@ class PatchrightBrowser:
             await page.keyboard.type(value, delay=90)
 
     async def _click_continue(self) -> None:
-        selectors = (
-            'button[type="submit"]',
-            'button:text-is("继续")',
-            'button:text-is("完成帐户创建")',
-            'button:text-is("完成账户创建")',
-            'button:text-is("Continue")',
-            'button:text-is("Confirm")',
-        )
-        await self._click_first(selectors, "failed to locate a continue button")
+        assert self.page is not None
+        await click_first_continue_button(self.page)
 
     async def _click_first(self, selectors: tuple[str, ...], error_message: str) -> None:
         assert self.page is not None

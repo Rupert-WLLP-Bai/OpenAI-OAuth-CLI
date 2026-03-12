@@ -83,6 +83,8 @@ def test_admin_server_serves_minimal_admin_shell(tmp_path: Path) -> None:
             assert "loadAccounts" in html
             assert "applyBulkUpdate" in html
             assert "fetchInbox" in html
+            assert "refreshSelectedAccountDetail" in html
+            assert "extractCode(" not in html
             assert "mail_refresh_token" not in html
             assert "rt-alpha" not in html
             assert "rt-beta" not in html
@@ -182,7 +184,7 @@ def test_admin_server_returns_account_inbox(tmp_path: Path, monkeypatch) -> None
             async def fetch_inbox(self, email: str) -> dict[str, object]:
                 return {
                     "account": {"email": email, "group_name": "group-b", "is_registered": True, "is_primary": True},
-                    "messages": [{"id": "message-1", "subject": "Hello", "from_address": "noreply@openai.com", "received_at": "", "body_preview": "", "body_text": "Hello"}],
+                    "messages": [{"id": "message-1", "subject": "Hello", "from_address": "noreply@openai.com", "received_at": "", "body_preview": "", "body_text": "Hello", "verification_code": "654321"}],
                 }
 
         monkeypatch.setattr(admin_server, "InboxService", StubInboxService)
@@ -200,6 +202,49 @@ def test_admin_server_returns_account_inbox(tmp_path: Path, monkeypatch) -> None
                 payload = await inbox_response.json()
                 assert payload["account"]["email"] == "beta@example.com"
                 assert payload["messages"][0]["subject"] == "Hello"
+                assert payload["messages"][0]["verification_code"] == "654321"
+        finally:
+            await server.stop()
+
+    asyncio.run(scenario())
+
+
+def test_admin_server_uses_store_email_lookup_for_account_routes(tmp_path: Path, monkeypatch) -> None:
+    async def scenario() -> None:
+        db_path = _create_accounts_db(tmp_path)
+        server = admin_server.LocalAccountAdminServer(db_path=db_path, port=0)
+        await server.start()
+        try:
+            async with aiohttp.ClientSession() as session:
+                accounts_response = await session.get(f"{server.base_url}/api/accounts", params={"query": "beta"})
+                accounts = await accounts_response.json()
+                account_id = int(accounts["items"][0]["id"])
+
+                lookup_calls: list[int] = []
+
+                def fake_get_account_email_by_id(requested_id: int) -> str:
+                    lookup_calls.append(requested_id)
+                    return "beta@example.com"
+
+                monkeypatch.setattr(server._store, "get_account_email_by_id", fake_get_account_email_by_id)
+
+                def failing_connect():
+                    raise AssertionError("route should not reach into _connect for account email lookup")
+
+                monkeypatch.setattr(server._store, "_connect", failing_connect)
+                class StubInboxService:
+                    def __init__(self, store: Any, *, proxy: str | None = None) -> None:
+                        self.store = store
+                        self.proxy = proxy
+
+                    async def fetch_inbox(self, email: str) -> dict[str, object]:
+                        return {"account": {"email": email}, "messages": []}
+
+                monkeypatch.setattr(admin_server, "InboxService", StubInboxService)
+
+                inbox_response = await session.get(f"{server.base_url}/api/accounts/{account_id}/inbox")
+                assert inbox_response.status == 200
+                assert lookup_calls == [account_id]
         finally:
             await server.stop()
 

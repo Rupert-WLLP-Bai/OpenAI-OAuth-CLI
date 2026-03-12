@@ -400,3 +400,44 @@ def test_oauth_login_verifier_sleeps_while_waiting_for_transition(
         asyncio.run(run())
 
     assert sleep_calls == [0.1]
+
+
+def test_oauth_login_verifier_delegates_to_shared_oauth_runner(monkeypatch: pytest.MonkeyPatch) -> None:
+    browser = FakeOAuthBrowser(states=["email"])
+    account = MailAccountRecord(
+        email="zoe_smith_1994@example.com",
+        mail_client_id="client-id",
+        mail_refresh_token="refresh-token",
+    )
+    provider = FakeCodeProvider()
+    verifier = OAuthLoginVerifier(browser=browser, code_provider=provider)
+    callback_task = object()
+    captured: dict[str, object] = {}
+
+    async def fake_run_oauth_login_flow(**kwargs: object) -> str:
+        captured.update(kwargs)
+        return "callback"
+
+    monkeypatch.setattr("openai_register.state_machine.run_oauth_login_flow", fake_run_oauth_login_flow, raising=False)
+
+    result = asyncio.run(
+        verifier.complete_login(
+            account=account,
+            email=account.email,
+            password="pw",
+            timeout=5,
+            callback_url="http://localhost:1455/auth/callback",
+            callback_task=callback_task,
+        )
+    )
+
+    assert result == "callback"
+    assert captured["browser"] is browser
+    assert captured["code_provider"] is provider
+    assert captured["account"] is account
+    assert captured["email"] == account.email
+    assert captured["password"] == "pw"
+    assert captured["timeout"] == 5
+    assert captured["callback_url"] == "http://localhost:1455/auth/callback"
+    assert callable(captured["callback_done"])
+    assert callable(captured["on_error"])

@@ -4,8 +4,9 @@ import asyncio
 import hashlib
 import re
 from datetime import date, timedelta
+from typing import cast
 
-from openai_auth_core.flow import FlowDeadline
+from openai_auth_core.flow import FlowDeadline, OAuthLoginDriver, run_oauth_login_flow
 
 from .diagnostics import RunLogger
 from .models import MailAccountRecord, OAuthLoginBrowser, RegistrationBrowser, VerificationCodeProvider
@@ -135,60 +136,24 @@ class OAuthLoginVerifier:
         password: str,
         timeout: int,
         callback_url: str,
-        callback_task: asyncio.Task[object],
+        callback_task: object,
     ) -> str:
-        deadline = FlowDeadline(timeout=timeout)
-        last_state = ""
-        handled_once = False
+        return await run_oauth_login_flow(
+            browser=cast(OAuthLoginDriver, self.browser),
+            code_provider=self.code_provider,
+            account=account,
+            email=email,
+            password=password,
+            timeout=timeout,
+            callback_url=callback_url,
+            callback_done=getattr(callback_task, "done", lambda: False),
+            on_state_change=self._log_oauth_state_change,
+            on_error=self._capture_verify_login_error,
+        )
 
-        while not deadline.expired():
-            state = await self.browser.current_oauth_state(
-                callback_url=callback_url,
-                callback_done=callback_task.done(),
-            )
-            if state != last_state:
-                last_state = state
-                handled_once = False
-                if self.logger is not None:
-                    self.logger.log_event("oauth_state_change", state=state)
+    def _log_oauth_state_change(self, state: str) -> None:
+        if self.logger is not None:
+            self.logger.log_event("oauth_state_change", state=state)
 
-            if state == "email":
-                if not handled_once:
-                    await self.browser.submit_email(email)
-                    handled_once = True
-                else:
-                    await asyncio.sleep(WAIT_FOR_TRANSITION_DELAY_SECONDS)
-                continue
-            if state == "password":
-                if not handled_once:
-                    await self.browser.submit_password(password)
-                    handled_once = True
-                else:
-                    await asyncio.sleep(WAIT_FOR_TRANSITION_DELAY_SECONDS)
-                continue
-            if state == "verification_code":
-                if not handled_once:
-                    remaining_timeout = deadline.remaining_timeout()
-                    code = await self.code_provider.get_code(account=account, timeout=remaining_timeout)
-                    if not code:
-                        raise RuntimeError("verification code required but unavailable")
-                    await self.browser.submit_verification_code(code)
-                    handled_once = True
-                else:
-                    await asyncio.sleep(WAIT_FOR_TRANSITION_DELAY_SECONDS)
-                continue
-            if state == "consent":
-                if not handled_once:
-                    await self.browser.click_continue()
-                    handled_once = True
-                else:
-                    await asyncio.sleep(WAIT_FOR_TRANSITION_DELAY_SECONDS)
-                continue
-            if state == "callback":
-                return state
-            if state == "error":
-                await self.browser.capture_debug_artifacts("verify-login-error")
-                raise RuntimeError(self.browser.get_oauth_error_message())
-            await asyncio.sleep(1)
-
-        raise RuntimeError("login timed out before reaching callback state")
+    async def _capture_verify_login_error(self) -> None:
+        await self.browser.capture_debug_artifacts("verify-login-error")

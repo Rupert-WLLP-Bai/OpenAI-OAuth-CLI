@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
 
 CHROMIUM_ARGS = (
@@ -8,7 +8,7 @@ CHROMIUM_ARGS = (
     "--disable-web-security",
     "--disable-features=IsolateOrigins,site-per-process",
 )
-DEFAULT_VIEWPORT = {"width": 1280, "height": 800}
+DEFAULT_VIEWPORT: Any = {"width": 1280, "height": 800}
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -28,7 +28,7 @@ async def start_browser_session(*, proxy: str | None) -> tuple[Any, Any, Any, An
 
     browser = await playwright.chromium.launch(**browser_args)
     context = await browser.new_context(
-        viewport=cast(Any, DEFAULT_VIEWPORT),
+        viewport=DEFAULT_VIEWPORT,
         user_agent=DEFAULT_USER_AGENT,
     )
     page = await context.new_page()
