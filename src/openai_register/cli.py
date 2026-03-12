@@ -5,6 +5,7 @@ import asyncio
 import os
 from pathlib import Path
 import sys
+from typing import Literal
 
 from dotenv import load_dotenv
 
@@ -12,7 +13,7 @@ from .accounts_db import RegistrationAccountStore
 from .browser import PatchrightBrowser
 from .callback import CallbackServer
 from .diagnostics import RunLogger
-from .mailbox import Wyx66Provider
+from .mailbox import create_mail_provider
 from .models import MailAccountRecord
 from .oauth import build_auth_url, make_pkce_material, validate_callback_result
 from .state_machine import OAuthLoginVerifier, RegistrationStateMachine
@@ -21,6 +22,7 @@ from .state_machine import OAuthLoginVerifier, RegistrationStateMachine
 DEFAULT_CALLBACK_PORT = 1455
 DEFAULT_ARTIFACTS_DIR = Path("logs/openai-register")
 PASSWORD_ENV_VAR = "OPENAI_ACCOUNT_PASSWORD"
+MailProviderChoice = Literal["auto", "wyx66", "graph"]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -35,6 +37,12 @@ def build_parser() -> argparse.ArgumentParser:
     register.add_argument("--proxy")
     register.add_argument("--callback-port", type=int, default=DEFAULT_CALLBACK_PORT)
     register.add_argument("--artifacts-dir", default=str(DEFAULT_ARTIFACTS_DIR))
+    register.add_argument(
+        "--mail-provider",
+        choices=["auto", "wyx66", "graph"],
+        default="auto",
+        help="Mail provider for verification codes (auto=detect from refresh_token)",
+    )
 
     verify = subparsers.add_parser("verify-login", help="Verify that an account can complete a real login flow")
     verify.add_argument("--email", required=True, help="Account email address")
@@ -44,6 +52,12 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--proxy")
     verify.add_argument("--callback-port", type=int, default=DEFAULT_CALLBACK_PORT)
     verify.add_argument("--artifacts-dir", default=str(DEFAULT_ARTIFACTS_DIR))
+    verify.add_argument(
+        "--mail-provider",
+        choices=["auto", "wyx66", "graph"],
+        default="auto",
+        help="Mail provider for verification codes (auto=detect from refresh_token)",
+    )
 
     return parser
 
@@ -81,6 +95,7 @@ async def run_register(
     proxy: str | None,
     callback_port: int,
     artifacts_dir: str,
+    mail_provider: MailProviderChoice = "auto",
 ) -> str:
     logger = RunLogger(base_dir=Path(artifacts_dir), command_name="register", email=email)
     store = RegistrationAccountStore(Path(db_path))
@@ -90,7 +105,7 @@ async def run_register(
     store.mark_registration_started(email)
     browser: PatchrightBrowser | None = None
     try:
-        code_provider = Wyx66Provider(proxy=proxy)
+        code_provider = create_mail_provider(account, provider_choice=mail_provider, proxy=proxy)
         await code_provider.prime_inbox(account=account)
         async with PatchrightBrowser(proxy=proxy, logger=logger) as browser:
             machine = RegistrationStateMachine(browser=browser, code_provider=code_provider)
@@ -109,6 +124,7 @@ async def run_register(
             proxy=proxy,
             callback_port=callback_port,
             logger=logger,
+            mail_provider=mail_provider,
         )
         store.mark_registration_succeeded(email)
     except Exception as exc:
@@ -134,6 +150,7 @@ async def verify_registered_account(
     proxy: str | None,
     callback_port: int,
     logger: RunLogger,
+    mail_provider: MailProviderChoice = "auto",
 ) -> None:
     logger.log_event("strict_verification_started", email=email, callback_port=callback_port)
     _, code_challenge, state = make_pkce_material()
@@ -144,7 +161,7 @@ async def verify_registered_account(
     callback_task = asyncio.create_task(server.wait_for_result(timeout=timeout))
     browser: PatchrightBrowser | None = None
     try:
-        code_provider = Wyx66Provider(proxy=proxy)
+        code_provider = create_mail_provider(account, provider_choice=mail_provider, proxy=proxy)
         await code_provider.prime_inbox(account=account)
         async with PatchrightBrowser(proxy=proxy, logger=logger) as browser:
             verifier = OAuthLoginVerifier(browser=browser, code_provider=code_provider, logger=logger)
@@ -185,6 +202,7 @@ async def run_verify_login(
     proxy: str | None,
     callback_port: int,
     artifacts_dir: str,
+    mail_provider: MailProviderChoice = "auto",
 ) -> str:
     logger = RunLogger(base_dir=Path(artifacts_dir), command_name="verify-login", email=email)
     store = RegistrationAccountStore(Path(db_path))
@@ -199,6 +217,7 @@ async def run_verify_login(
             proxy=proxy,
             callback_port=callback_port,
             logger=logger,
+            mail_provider=mail_provider,
         )
     except Exception as exc:
         logger.log_event("verify_login_failed", error=str(exc))
@@ -222,6 +241,7 @@ def main(argv: list[str] | None = None) -> int:
                     proxy=args.proxy,
                     callback_port=args.callback_port,
                     artifacts_dir=args.artifacts_dir,
+                    mail_provider=args.mail_provider,
                 )
             )
             sys.stdout.write(f"registered:{email}\n")
@@ -238,6 +258,7 @@ def main(argv: list[str] | None = None) -> int:
                     proxy=args.proxy,
                     callback_port=args.callback_port,
                     artifacts_dir=args.artifacts_dir,
+                    mail_provider=args.mail_provider,
                 )
             )
             sys.stdout.write(f"verified:{email}\n")

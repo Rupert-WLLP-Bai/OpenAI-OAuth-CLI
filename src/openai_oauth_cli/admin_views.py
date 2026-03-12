@@ -334,6 +334,7 @@ def render_admin_shell() -> str:
                   <button class="secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="copyToClipboard($('detail-email').textContent)">复制</button>
                 </div>
                 <div style="display: flex; gap: 8px;">
+                  <button id="change-group-btn" class="secondary">加入分组</button>
                   <button id="toggle-reg-btn" class="secondary">切换注册状态</button>
                   <button id="toggle-pri-btn" class="secondary">切换主账号</button>
                 </div>
@@ -409,7 +410,7 @@ def render_admin_shell() -> str:
         <div style="display: flex; flex-direction: column; gap: 12px;">
           <div>
             <label class="label">修改分组</label>
-            <input id="batch-group-input" type="text" placeholder="留空不修改">
+            <input id="batch-group-input" type="text" placeholder="留空不修改，或输入新分组名">
           </div>
           <div>
             <label class="label">注册状态</label>
@@ -436,6 +437,28 @@ def render_admin_shell() -> str:
       </div>
     </div>
 
+    <!-- Change Group Modal -->
+    <div id="group-overlay" class="overlay">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 style="margin: 0;">加入分组</h2>
+          <button class="secondary" onclick="closeModal('group-overlay')">✕</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div>
+            <label class="label">选择或输入分组名</label>
+            <input id="group-input" type="text" list="group-datalist" placeholder="输入新分组名或选择已有分组" style="width: 100%;">
+            <datalist id="group-datalist"></datalist>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">* 输入新分组名将自动创建。</p>
+        </div>
+        <div class="modal-footer">
+          <button class="secondary" onclick="closeModal('group-overlay')">取消</button>
+          <button id="apply-group-button">保存</button>
+        </div>
+      </div>
+    </div>
+
     <script>
       const CONFIG = {
         accountsPerPage: 50,
@@ -451,7 +474,8 @@ def render_admin_shell() -> str:
         selectedAccount: null,
         inbox: [],
         inboxPage: 1,
-        autoRefreshTimer: null
+        autoRefreshTimer: null,
+        allGroups: []
       };
 
       // --- Utilities ---
@@ -496,17 +520,32 @@ def render_admin_shell() -> str:
         $("stat-total").textContent = s.accounts;
         $("stat-registered").textContent = s.registered;
         $("stat-primary").textContent = s.primary;
-        
+
+        // Store groups for datalist
+        state.allGroups = Object.keys(s.groups).sort();
+
         const gFilter = $("group-filter");
         const current = gFilter.value;
         gFilter.innerHTML = '<option value="">所有分组</option>';
-        Object.keys(s.groups).sort().forEach(g => {
+        state.allGroups.forEach(g => {
           const opt = document.createElement("option");
           opt.value = g;
           opt.textContent = g || "(无分组)";
           gFilter.appendChild(opt);
         });
         gFilter.value = current;
+      }
+
+      async function loadGroupsDatalist() {
+        const groups = await api("/api/groups");
+        state.allGroups = groups;
+        const datalist = $("group-datalist");
+        datalist.innerHTML = "";
+        groups.forEach(g => {
+          const opt = document.createElement("option");
+          opt.value = g;
+          datalist.appendChild(opt);
+        });
       }
 
       async function loadAccounts(page = 1) {
@@ -655,16 +694,16 @@ def render_admin_shell() -> str:
       async function applyBulkUpdate() {
         const emails = state.accounts.map(a => a.email);
         if (!emails.length) return;
-        
+
         const body = {};
         const group = $("batch-group-input").value.trim();
         const reg = $("batch-registered-input").value;
         const pri = $("batch-primary-input").value;
-        
+
         if (group) body.group_name = group;
         if (reg) body.is_registered = reg === "true";
         if (pri) body.is_primary = pri === "true";
-        
+
         if (Object.keys(body).length === 0) return;
         body.emails = emails;
 
@@ -675,6 +714,37 @@ def render_admin_shell() -> str:
           await $("refresh-accounts").onclick();
         } catch (e) { alert(e.message); }
         showLoading(false);
+      }
+
+      async function changeAccountGroup() {
+        if (!state.selectedAccountId) return;
+        const groupName = $("group-input").value.trim();
+        if (!groupName) {
+          alert("请输入分组名");
+          return;
+        }
+
+        showLoading(true);
+        try {
+          await api(`/api/accounts/${state.selectedAccountId}`, {
+            method: "PATCH",
+            body: { group_name: groupName }
+          });
+          closeModal("group-overlay");
+          $("group-input").value = "";
+          // Refresh account details
+          const updated = await api(`/api/accounts?query=${state.selectedAccount.email}`);
+          if (updated.items.length) selectAccount(updated.items[0]);
+          loadSummary();
+          loadAccounts(state.currentPage);
+        } catch (e) { alert(e.message); }
+        showLoading(false);
+      }
+
+      function openGroupModal() {
+        loadGroupsDatalist();
+        $("group-input").value = state.selectedAccount?.group_name || "";
+        openModal("group-overlay");
       }
 
       async function importSources() {
@@ -725,6 +795,9 @@ def render_admin_shell() -> str:
 
       $("show-batch").onclick = () => openModal("batch-overlay");
       $("apply-batch-button").onclick = () => applyBulkUpdate();
+
+      $("change-group-btn").onclick = () => openGroupModal();
+      $("apply-group-button").onclick = () => changeAccountGroup();
 
       $("export-button").onclick = () => {
         const group = $("group-filter").value;

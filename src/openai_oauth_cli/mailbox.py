@@ -3,7 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable, Protocol
 
-from openai_auth_core.mailbox import MAIL_POLL_INTERVAL_SECONDS, WYX66_API_BASE, Wyx66Provider, extract_verification_code
+from openai_auth_core.mailbox import (
+    GRAPH_API_BASE,
+    GraphApiProvider,
+    MAIL_POLL_INTERVAL_SECONDS,
+    WYX66_API_BASE,
+    Wyx66Provider,
+    create_mail_provider,
+    extract_verification_code,
+)
 
 from .models import AccountRecord
 
@@ -56,11 +64,14 @@ def find_account_by_email(accounts: Iterable[AccountRecord], email: str) -> Acco
 
 __all__ = [
     "DEFAULT_ACCOUNTS_FILE",
+    "GRAPH_API_BASE",
+    "GraphApiProvider",
     "MAIL_POLL_INTERVAL_SECONDS",
     "PASSWORD_ENV_VAR",
     "VerificationCodeProvider",
     "WYX66_API_BASE",
     "Wyx66Provider",
+    "create_mail_provider",
     "extract_verification_code",
     "find_account_by_email",
     "load_accounts_file",

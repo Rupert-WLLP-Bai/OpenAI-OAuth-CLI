@@ -49,6 +49,25 @@ def test_login_command_reads_password_from_dotenv(
     assert captured_args["db_path"] == str(cli.DEFAULT_DB_PATH)
 
 
+def test_login_command_forwards_mail_provider_choice(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured_args: dict[str, object] = {}
+
+    async def fake_run_login(**kwargs: object) -> str:
+        captured_args.update(kwargs)
+        return "rt_example"
+
+    monkeypatch.setattr(cli, "run_login", fake_run_login)
+
+    exit_code = cli.main(["login", "--email", "user@example.com", "--password", "pw", "--mail-provider", "graph"])
+
+    _ = capsys.readouterr()
+    assert exit_code == 0
+    assert captured_args["mail_provider"] == "graph"
+
+
 def test_login_command_requires_password_when_flag_and_env_missing(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -265,7 +284,16 @@ def test_run_login_loads_account_from_sqlite_db(tmp_path: Path, monkeypatch: pyt
     monkeypatch.setattr(cli, "CallbackServer", FakeCallbackServer)
     monkeypatch.setattr(cli, "PatchrightBrowser", FakeBrowser)
     monkeypatch.setattr(cli, "LoginStateMachine", FakeLoginStateMachine)
-    monkeypatch.setattr(cli, "Wyx66Provider", FakeProvider)
+    def fake_create_mail_provider(
+        account: object,
+        *,
+        provider_choice: str = "auto",
+        proxy: str | None = None,
+    ) -> FakeProvider:
+        captured["provider_choice"] = provider_choice
+        return FakeProvider(proxy=proxy)
+
+    monkeypatch.setattr(cli, "create_mail_provider", fake_create_mail_provider)
     monkeypatch.setattr(cli, "exchange_code_for_tokens", fake_exchange_code_for_tokens)
     monkeypatch.setattr(cli, "make_pkce_material", lambda: ("code-verifier-123", "challenge-123", "state-123"))
 
@@ -290,6 +318,7 @@ def test_run_login_loads_account_from_sqlite_db(tmp_path: Path, monkeypatch: pyt
     assert captured["email"] == "user@example.com"
     assert captured["password"] == "pw"
     assert captured["timeout"] == 30
+    assert captured["provider_choice"] == "auto"
     assert captured["primed_account"] == "user@example.com"
 
 

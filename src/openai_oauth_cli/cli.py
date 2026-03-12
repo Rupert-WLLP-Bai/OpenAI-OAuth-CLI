@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import sqlite3
 import sys
+from typing import Literal
 import webbrowser
 
 from dotenv import load_dotenv
@@ -15,7 +16,7 @@ from .accounts_db import AccountStore
 from .admin_server import LocalAccountAdminServer
 from .browser import PatchrightBrowser
 from .callback import CallbackServer
-from .mailbox import DEFAULT_ACCOUNTS_FILE, Wyx66Provider
+from .mailbox import DEFAULT_ACCOUNTS_FILE, create_mail_provider
 from .oauth import (
     build_auth_url,
     build_callback_url,
@@ -27,6 +28,7 @@ from .state_machine import LoginStateMachine
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "data" / "accounts.sqlite3"
 PASSWORD_ENV_VAR = "OPENAI_ACCOUNT_PASSWORD"
+MailProviderChoice = Literal["auto", "wyx66", "graph"]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -45,6 +47,12 @@ def build_parser() -> argparse.ArgumentParser:
     login.add_argument("--callback-port", type=int, default=1455)
     login.add_argument("--timeout", type=int, default=300)
     login.add_argument("--proxy")
+    login.add_argument(
+        "--mail-provider",
+        choices=["auto", "wyx66", "graph"],
+        default="auto",
+        help="Mail provider for verification codes (auto=detect from refresh_token)",
+    )
 
     db = subparsers.add_parser("db", help="Manage the account SQLite database")
     db_subparsers = db.add_subparsers(dest="db_command", required=True)
@@ -133,6 +141,7 @@ async def run_login(
     callback_port: int,
     timeout: int,
     proxy: str | None,
+    mail_provider: MailProviderChoice = "auto",
 ) -> str:
     del accounts_file
     resolved_db_path = Path(db_path or DEFAULT_DB_PATH)
@@ -162,7 +171,7 @@ async def run_login(
             code_challenge=code_challenge,
             state=state,
         )
-        code_provider = Wyx66Provider(proxy=proxy)
+        code_provider = create_mail_provider(account, provider_choice=mail_provider, proxy=proxy)
         await code_provider.prime_inbox(account=account)
         async with PatchrightBrowser(
             proxy=proxy,
@@ -301,6 +310,7 @@ def main(argv: list[str] | None = None) -> int:
                 callback_port=args.callback_port,
                 timeout=args.timeout,
                 proxy=args.proxy,
+                mail_provider=args.mail_provider,
             )
         )
     except KeyboardInterrupt:

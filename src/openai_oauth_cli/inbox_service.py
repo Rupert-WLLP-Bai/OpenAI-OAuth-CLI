@@ -1,32 +1,12 @@
 from __future__ import annotations
 
-import html
-import re
 from typing import Any
 
 import aiohttp
 
-from openai_auth_core.mailbox import Wyx66Provider
+from openai_auth_core.mailbox import Wyx66Provider, _html_to_text
 
 from .accounts_db import AccountStore
-
-
-_SCRIPT_STYLE_RE = re.compile(r"(?is)<(script|style).*?>.*?</\1>")
-_TAG_RE = re.compile(r"(?s)<[^>]+>")
-_WHITESPACE_RE = re.compile(r"[ \t\r\f\v]+")
-
-
-def _html_to_text(value: str) -> str:
-    if not value:
-        return ""
-    text = _SCRIPT_STYLE_RE.sub(" ", value)
-    text = re.sub(r"(?i)<br\\s*/?>", "\n", text)
-    text = re.sub(r"(?i)</p\\s*>", "\n", text)
-    text = _TAG_RE.sub(" ", text)
-    text = html.unescape(text)
-    text = _WHITESPACE_RE.sub(" ", text)
-    text = re.sub(r" *\n *", "\n", text)
-    return text.strip()
 
 
 def _normalize_message(message: dict[str, Any]) -> dict[str, str]:

@@ -64,6 +64,37 @@ def test_register_command_requires_password_when_flag_and_env_missing(
     )
 
 
+def test_register_command_forwards_mail_provider_choice(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured_args: dict[str, object] = {}
+
+    async def fake_run_register(**kwargs: object) -> str:
+        captured_args.update(kwargs)
+        return "user@example.com"
+
+    monkeypatch.setattr(cli, "run_register", fake_run_register)
+
+    exit_code = cli.main(
+        [
+            "register",
+            "--email",
+            "user@example.com",
+            "--db-path",
+            "/tmp/accounts.sqlite3",
+            "--password",
+            "pw",
+            "--mail-provider",
+            "graph",
+        ]
+    )
+
+    _ = capsys.readouterr()
+    assert exit_code == 0
+    assert captured_args["mail_provider"] == "graph"
+
+
 def test_register_command_prints_success_message(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -183,7 +214,16 @@ def test_run_register_marks_started_then_success(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(cli, "RegistrationAccountStore", FakeStore)
     monkeypatch.setattr(cli, "PatchrightBrowser", FakeBrowser)
     monkeypatch.setattr(cli, "RegistrationStateMachine", FakeMachine)
-    monkeypatch.setattr(cli, "Wyx66Provider", FakeProvider)
+    def fake_create_mail_provider(
+        account: object,
+        *,
+        provider_choice: str = "auto",
+        proxy: str | None = None,
+    ) -> FakeProvider:
+        calls.append(("create_mail_provider", provider_choice))
+        return FakeProvider(proxy=proxy)
+
+    monkeypatch.setattr(cli, "create_mail_provider", fake_create_mail_provider)
     monkeypatch.setattr(cli, "verify_registered_account", fake_verify_registered_account)
 
     result = cli.asyncio.run(
@@ -203,6 +243,7 @@ def test_run_register_marks_started_then_success(monkeypatch: pytest.MonkeyPatch
         ("store_init", tmp_path / "accounts.sqlite3"),
         ("get_mail_account", "user@example.com"),
         ("mark_started", "user@example.com"),
+        ("create_mail_provider", "auto"),
         ("provider_init", None),
         ("prime_inbox", "user@example.com"),
         ("browser_init", None),
@@ -284,7 +325,16 @@ def test_run_register_marks_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     monkeypatch.setattr(cli, "RegistrationAccountStore", FakeStore)
     monkeypatch.setattr(cli, "PatchrightBrowser", FakeBrowser)
     monkeypatch.setattr(cli, "RegistrationStateMachine", FakeMachine)
-    monkeypatch.setattr(cli, "Wyx66Provider", FakeProvider)
+    def fake_create_mail_provider(
+        account: object,
+        *,
+        provider_choice: str = "auto",
+        proxy: str | None = None,
+    ) -> FakeProvider:
+        calls.append(("create_mail_provider", provider_choice))
+        return FakeProvider(proxy=proxy)
+
+    monkeypatch.setattr(cli, "create_mail_provider", fake_create_mail_provider)
     monkeypatch.setattr(cli, "verify_registered_account", fake_verify_registered_account)
 
     with pytest.raises(RuntimeError, match="verification timed out"):
@@ -302,6 +352,7 @@ def test_run_register_marks_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 
     assert calls == [
         ("mark_started", "user@example.com"),
+        ("create_mail_provider", "auto"),
         ("prime_inbox", "user@example.com"),
         ("capture_debug_artifacts", "register-failure"),
         ("mark_failed", ("user@example.com", "verification timed out")),
@@ -379,7 +430,16 @@ def test_run_register_marks_failure_when_post_registration_verification_fails(
     monkeypatch.setattr(cli, "RegistrationAccountStore", FakeStore)
     monkeypatch.setattr(cli, "PatchrightBrowser", FakeBrowser)
     monkeypatch.setattr(cli, "RegistrationStateMachine", FakeMachine)
-    monkeypatch.setattr(cli, "Wyx66Provider", FakeProvider)
+    def fake_create_mail_provider(
+        account: object,
+        *,
+        provider_choice: str = "auto",
+        proxy: str | None = None,
+    ) -> FakeProvider:
+        calls.append(("create_mail_provider", provider_choice))
+        return FakeProvider(proxy=proxy)
+
+    monkeypatch.setattr(cli, "create_mail_provider", fake_create_mail_provider)
     monkeypatch.setattr(cli, "verify_registered_account", fake_verify_registered_account)
 
     with pytest.raises(RuntimeError, match="strict login verification failed"):
@@ -397,6 +457,7 @@ def test_run_register_marks_failure_when_post_registration_verification_fails(
 
     assert calls == [
         ("mark_started", "user@example.com"),
+        ("create_mail_provider", "auto"),
         ("prime_inbox", "user@example.com"),
         ("capture_debug_artifacts", "register-failure"),
         ("mark_failed", ("user@example.com", "strict login verification failed")),
