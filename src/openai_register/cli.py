@@ -5,15 +5,13 @@ import asyncio
 import os
 from pathlib import Path
 import sys
-from typing import Literal
-
-from dotenv import load_dotenv
+from typing import Literal, cast
 
 from .accounts_db import RegistrationAccountStore
 from .browser import PatchrightBrowser
 from .callback import CallbackServer
 from .diagnostics import RunLogger
-from .mailbox import create_mail_provider
+from .mailbox import DEFAULT_PASSWORD, create_mail_provider
 from .models import MailAccountRecord
 from .oauth import build_auth_url, make_pkce_material, validate_callback_result
 from .state_machine import OAuthLoginVerifier, RegistrationStateMachine
@@ -21,7 +19,6 @@ from .state_machine import OAuthLoginVerifier, RegistrationStateMachine
 
 DEFAULT_CALLBACK_PORT = 1455
 DEFAULT_ARTIFACTS_DIR = Path("logs/openai-register")
-PASSWORD_ENV_VAR = "OPENAI_ACCOUNT_PASSWORD"
 MailProviderChoice = Literal["auto", "wyx66", "graph"]
 
 
@@ -32,7 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
     register = subparsers.add_parser("register", help="Automate ChatGPT account registration")
     register.add_argument("--email", required=True, help="Account email address")
     register.add_argument("--db-path", required=True, help="SQLite account database path")
-    register.add_argument("--password", help=f"Account password. Defaults to ${PASSWORD_ENV_VAR} from .env when omitted.")
+    register.add_argument("--password", default=DEFAULT_PASSWORD, help="Account password")
     register.add_argument("--timeout", type=int, default=300)
     register.add_argument("--proxy")
     register.add_argument("--callback-port", type=int, default=DEFAULT_CALLBACK_PORT)
@@ -47,7 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify = subparsers.add_parser("verify-login", help="Verify that an account can complete a real login flow")
     verify.add_argument("--email", required=True, help="Account email address")
     verify.add_argument("--db-path", required=True, help="SQLite account database path")
-    verify.add_argument("--password", help=f"Account password. Defaults to ${PASSWORD_ENV_VAR} from .env when omitted.")
+    verify.add_argument("--password", default=DEFAULT_PASSWORD, help="Account password")
     verify.add_argument("--timeout", type=int, default=300)
     verify.add_argument("--proxy")
     verify.add_argument("--callback-port", type=int, default=DEFAULT_CALLBACK_PORT)
@@ -74,16 +71,6 @@ def resolve_proxy(proxy: str | None) -> str | None:
         if value:
             return value.strip()
     return None
-
-
-def resolve_password(password: str | None) -> str:
-    if password and password.strip():
-        return password
-    load_dotenv(dotenv_path=Path.cwd() / ".env")
-    env_password = os.getenv(PASSWORD_ENV_VAR, "").strip()
-    if env_password:
-        return env_password
-    raise RuntimeError(f"account password is required. Pass --password or set {PASSWORD_ENV_VAR}.")
 
 
 async def run_register(
@@ -231,34 +218,32 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "register":
-            password = resolve_password(args.password)
             email = asyncio.run(
                 run_register(
                     email=args.email,
-                    password=password,
+                    password=args.password,
                     db_path=args.db_path,
                     timeout=args.timeout,
                     proxy=args.proxy,
                     callback_port=args.callback_port,
                     artifacts_dir=args.artifacts_dir,
-                    mail_provider=args.mail_provider,
+                    mail_provider=cast(MailProviderChoice, args.mail_provider),
                 )
             )
             sys.stdout.write(f"registered:{email}\n")
             return 0
 
         if args.command == "verify-login":
-            password = resolve_password(args.password)
             email = asyncio.run(
                 run_verify_login(
                     email=args.email,
-                    password=password,
+                    password=args.password,
                     db_path=args.db_path,
                     timeout=args.timeout,
                     proxy=args.proxy,
                     callback_port=args.callback_port,
                     artifacts_dir=args.artifacts_dir,
-                    mail_provider=args.mail_provider,
+                    mail_provider=cast(MailProviderChoice, args.mail_provider),
                 )
             )
             sys.stdout.write(f"verified:{email}\n")

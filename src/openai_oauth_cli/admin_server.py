@@ -23,8 +23,10 @@ class LocalAccountAdminServer:
         self.port = port
         self.proxy = proxy
         self._base_url = ""
+        self._static_dir = Path(__file__).resolve().parent / "static"
         self._store = AccountStore(self.db_path)
         self._app = web.Application(middlewares=[self._cache_control_middleware])
+        self._app.router.add_static("/static", path=self._static_dir, show_index=False)
         self._app.router.add_get("/", self._handle_root)
         self._app.router.add_get("/api/summary", self._handle_summary)
         self._app.router.add_get("/api/groups", self._handle_groups)
@@ -113,7 +115,7 @@ class LocalAccountAdminServer:
             query=request.query.get("query", ""),
             group_name=request.query.get("group_name") or None,
             is_registered=is_registered,
-            limit=int(request.query.get("limit", "50")),
+            limit=int(request.query.get("limit", "25")),
             offset=int(request.query.get("offset", "0")),
         )
         return self._json(payload)

@@ -187,7 +187,7 @@ def test_find_account_by_email_reads_from_sqlite_store(tmp_path: Path) -> None:
     db_path = tmp_path / "accounts.sqlite3"
     txt_path = tmp_path / "accounts.txt"
     txt_path.write_text(
-        "joann@example.com----pw----uuid-joann----rt-joann----x----Codex Team2\n",
+        "JoannRabiola1994@outlook.com----pw----uuid-joann----rt-joann----x----Codex Team2\n",
         encoding="utf-8",
     )
 
@@ -195,9 +195,9 @@ def test_find_account_by_email_reads_from_sqlite_store(tmp_path: Path) -> None:
     store.init_db()
     store.import_txt_file(txt_path)
 
-    account = store.find_account_by_email("  JOANN@EXAMPLE.COM  ")
+    account = store.find_account_by_email("  joannrabiola1994@OUTLOOK.COM  ")
 
-    assert account.email == "joann@example.com"
+    assert account.email == "JoannRabiola1994@outlook.com"
     assert account.mail_client_id == "uuid-joann"
     assert account.mail_refresh_token == "rt-joann"
     assert account.group == "Codex Team2"
@@ -298,11 +298,11 @@ def test_import_txt_file_inserts_new_accounts_with_sqlite_state_defaults(
     txt_path.write_text(
         "\n".join(
             [
-                "drake@example.com----pw----uuid-drake----rt-drake----x----gpt team 1",
-                "joann@example.com----pw----uuid-joann----rt-joann----x----Codex Team2",
-                "patience@example.com----pw----uuid-patience----rt-patience----x----gpt team 1",
-                "kyler@example.com----pw----uuid-kyler----rt-kyler----x----Codex Team2",
-                "garrett@example.com----pw----uuid-garrett----rt-garrett----x----默认分组",
+                "DrakePechuli1992@outlook.com----pw----uuid-drake----rt-drake----x----gpt team 1",
+                "JoannRabiola1994@outlook.com----pw----uuid-joann----rt-joann----x----Codex Team2",
+                "PatienceTyszko1991@outlook.com----pw----uuid-patience----rt-patience----x----gpt team 1",
+                "KylerLarios0421@outlook.com----pw----uuid-kyler----rt-kyler----x----Codex Team2",
+                "GarrettHenegar1988@outlook.com----pw----uuid-garrett----rt-garrett----x----默认分组",
             ]
         )
         + "\n",
@@ -322,11 +322,11 @@ def test_import_txt_file_inserts_new_accounts_with_sqlite_state_defaults(
         for row in rows
     }
 
-    assert status_by_email["drake@example.com"] == (0, 0)
-    assert status_by_email["joann@example.com"] == (0, 0)
-    assert status_by_email["patience@example.com"] == (0, 0)
-    assert status_by_email["kyler@example.com"] == (0, 0)
-    assert status_by_email["garrett@example.com"] == (0, 0)
+    assert status_by_email["drakepechuli1992@outlook.com"] == (0, 0)
+    assert status_by_email["joannrabiola1994@outlook.com"] == (0, 0)
+    assert status_by_email["patiencetyszko1991@outlook.com"] == (0, 0)
+    assert status_by_email["kylerlarios0421@outlook.com"] == (0, 0)
+    assert status_by_email["garretthenegar1988@outlook.com"] == (0, 0)
 
 
 def test_import_txt_file_does_not_derive_state_from_group_name(tmp_path: Path) -> None:
@@ -335,8 +335,8 @@ def test_import_txt_file_does_not_derive_state_from_group_name(tmp_path: Path) -
     txt_path.write_text(
         "\n".join(
             [
-                "sofia@example.com----pw----uuid-sofia----rt-sofia----x----gpt team 1",
-                "brand-new@example.com----pw----uuid-brand-new----rt-brand-new----x----gpt team 1",
+                "SofiaGeckler33@outlook.com----pw----uuid-sofia----rt-sofia----x----gpt team 1",
+                "BrandNewGroupedUser@example.com----pw----uuid-brand-new----rt-brand-new----x----gpt team 1",
             ]
         )
         + "\n",
@@ -356,8 +356,8 @@ def test_import_txt_file_does_not_derive_state_from_group_name(tmp_path: Path) -
         for row in rows
     }
 
-    assert status_by_email["sofia@example.com"] == (0, 0)
-    assert status_by_email["brand-new@example.com"] == (0, 0)
+    assert status_by_email["sofiageckler33@outlook.com"] == (0, 0)
+    assert status_by_email["brandnewgroupeduser@example.com"] == (0, 0)
 
 
 def test_import_txt_file_does_not_reseed_user_managed_flags_after_first_insert(tmp_path: Path) -> None:
@@ -367,9 +367,9 @@ def test_import_txt_file_does_not_reseed_user_managed_flags_after_first_insert(t
     first_path.write_text(
         "\n".join(
             [
-                "joann@example.com----pw----uuid-joann-1----rt-joann-1----x----Codex Team2",
-                "patience@example.com----pw----uuid-patience-1----rt-patience-1----x----gpt team 1",
-                "garrett@example.com----pw----uuid-garrett-1----rt-garrett-1----x----默认分组",
+                "JoannRabiola1994@outlook.com----pw----uuid-joann-1----rt-joann-1----x----Codex Team2",
+                "PatienceTyszko1991@outlook.com----pw----uuid-patience-1----rt-patience-1----x----gpt team 1",
+                "GarrettHenegar1988@outlook.com----pw----uuid-garrett-1----rt-garrett-1----x----默认分组",
             ]
         )
         + "\n",
@@ -378,10 +378,10 @@ def test_import_txt_file_does_not_reseed_user_managed_flags_after_first_insert(t
     second_path.write_text(
         "\n".join(
             [
-                "joann@example.com----pw----uuid-joann-2----rt-joann-2----x----Codex Team2",
-                "patience@example.com----pw----uuid-patience-2----rt-patience-2----x----gpt team 1",
-                "garrett@example.com----pw----uuid-garrett-2----rt-garrett-2----x----默认分组",
-                "sofia@example.com----pw----uuid-sofia-2----rt-sofia-2----x----gpt team 1",
+                "JoannRabiola1994@outlook.com----pw----uuid-joann-2----rt-joann-2----x----Codex Team2",
+                "PatienceTyszko1991@outlook.com----pw----uuid-patience-2----rt-patience-2----x----gpt team 1",
+                "GarrettHenegar1988@outlook.com----pw----uuid-garrett-2----rt-garrett-2----x----默认分组",
+                "SofiaGeckler33@outlook.com----pw----uuid-sofia-2----rt-sofia-2----x----gpt team 1",
             ]
         )
         + "\n",
@@ -399,7 +399,7 @@ def test_import_txt_file_does_not_reseed_user_managed_flags_after_first_insert(t
         SET is_registered = ?, is_primary = ?
         WHERE lower(email) = lower(?)
         """,
-        (1, 0, "joann@example.com"),
+        (1, 0, "JoannRabiola1994@outlook.com"),
     )
     _execute(
         db_path,
@@ -408,7 +408,7 @@ def test_import_txt_file_does_not_reseed_user_managed_flags_after_first_insert(t
         SET is_registered = ?, is_primary = ?
         WHERE lower(email) = lower(?)
         """,
-        (0, 0, "patience@example.com"),
+        (0, 0, "PatienceTyszko1991@outlook.com"),
     )
     _execute(
         db_path,
@@ -417,7 +417,7 @@ def test_import_txt_file_does_not_reseed_user_managed_flags_after_first_insert(t
         SET is_registered = ?, is_primary = ?
         WHERE lower(email) = lower(?)
         """,
-        (1, 0, "garrett@example.com"),
+        (1, 0, "GarrettHenegar1988@outlook.com"),
     )
 
     store.import_txt_file(second_path)
@@ -432,32 +432,32 @@ def test_import_txt_file_does_not_reseed_user_managed_flags_after_first_insert(t
     )
     accounts_by_email = {str(row["email"]).strip().casefold(): row for row in rows}
 
-    assert accounts_by_email["joann@example.com"]["mail_client_id"] == "uuid-joann-2"
-    assert accounts_by_email["joann@example.com"]["mail_refresh_token"] == "rt-joann-2"
+    assert accounts_by_email["joannrabiola1994@outlook.com"]["mail_client_id"] == "uuid-joann-2"
+    assert accounts_by_email["joannrabiola1994@outlook.com"]["mail_refresh_token"] == "rt-joann-2"
     assert (
-        accounts_by_email["joann@example.com"]["is_registered"],
-        accounts_by_email["joann@example.com"]["is_primary"],
+        accounts_by_email["joannrabiola1994@outlook.com"]["is_registered"],
+        accounts_by_email["joannrabiola1994@outlook.com"]["is_primary"],
     ) == (1, 0)
 
-    assert accounts_by_email["patience@example.com"]["mail_client_id"] == "uuid-patience-2"
-    assert accounts_by_email["patience@example.com"]["mail_refresh_token"] == "rt-patience-2"
+    assert accounts_by_email["patiencetyszko1991@outlook.com"]["mail_client_id"] == "uuid-patience-2"
+    assert accounts_by_email["patiencetyszko1991@outlook.com"]["mail_refresh_token"] == "rt-patience-2"
     assert (
-        accounts_by_email["patience@example.com"]["is_registered"],
-        accounts_by_email["patience@example.com"]["is_primary"],
+        accounts_by_email["patiencetyszko1991@outlook.com"]["is_registered"],
+        accounts_by_email["patiencetyszko1991@outlook.com"]["is_primary"],
     ) == (0, 0)
 
-    assert accounts_by_email["garrett@example.com"]["mail_client_id"] == "uuid-garrett-2"
-    assert accounts_by_email["garrett@example.com"]["mail_refresh_token"] == "rt-garrett-2"
+    assert accounts_by_email["garretthenegar1988@outlook.com"]["mail_client_id"] == "uuid-garrett-2"
+    assert accounts_by_email["garretthenegar1988@outlook.com"]["mail_refresh_token"] == "rt-garrett-2"
     assert (
-        accounts_by_email["garrett@example.com"]["is_registered"],
-        accounts_by_email["garrett@example.com"]["is_primary"],
+        accounts_by_email["garretthenegar1988@outlook.com"]["is_registered"],
+        accounts_by_email["garretthenegar1988@outlook.com"]["is_primary"],
     ) == (1, 0)
 
-    assert accounts_by_email["sofia@example.com"]["mail_client_id"] == "uuid-sofia-2"
-    assert accounts_by_email["sofia@example.com"]["mail_refresh_token"] == "rt-sofia-2"
+    assert accounts_by_email["sofiageckler33@outlook.com"]["mail_client_id"] == "uuid-sofia-2"
+    assert accounts_by_email["sofiageckler33@outlook.com"]["mail_refresh_token"] == "rt-sofia-2"
     assert (
-        accounts_by_email["sofia@example.com"]["is_registered"],
-        accounts_by_email["sofia@example.com"]["is_primary"],
+        accounts_by_email["sofiageckler33@outlook.com"]["is_registered"],
+        accounts_by_email["sofiageckler33@outlook.com"]["is_primary"],
     ) == (0, 0)
 
 

@@ -10,13 +10,14 @@ from openai_auth_core.mailbox import (
     extract_verification_code,
 )
 
-PASSWORD_ENV_VAR = "OPENAI_ACCOUNT_PASSWORD"
+
+DEFAULT_PASSWORD = "C.WLLP159357"
 
 __all__ = [
+    "DEFAULT_PASSWORD",
     "GRAPH_API_BASE",
     "GraphApiProvider",
     "MAIL_POLL_INTERVAL_SECONDS",
-    "PASSWORD_ENV_VAR",
     "WYX66_API_BASE",
     "Wyx66Provider",
     "create_mail_provider",

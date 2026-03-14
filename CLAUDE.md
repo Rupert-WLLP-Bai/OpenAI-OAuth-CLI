@@ -98,8 +98,8 @@ Recommended route:
      --exclude 'secrets/' \
      --exclude 'logs/' \
      --exclude '*.sqlite3' \
-     <private-repo-root>/ \
-     <private-repo-root>/.worktrees/public-release-sanitized/
+     /home/pejoy/code/draft/research/openai-oauth-cli/ \
+     /home/pejoy/code/draft/research/openai-oauth-cli/.worktrees/public-release-sanitized/
    ```
 6. In that staging tree, remove or replace anything that should not become public:
    - passwords and secrets
@@ -112,7 +112,7 @@ Recommended route:
    - `uv run ty check`
 8. Publish the public repo from a clean sanitized tree using a public-safe author identity such as the GitHub no-reply email:
    ```bash
-   cd <private-repo-root>/.worktrees/public-release-sanitized
+   cd /home/pejoy/code/draft/research/openai-oauth-cli/.worktrees/public-release-sanitized
    git add -A
    git -c user.name='Rupert-WLLP-Bai' \
        -c user.email='Rupert-WLLP-Bai@users.noreply.github.com' \

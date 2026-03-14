@@ -1,12 +1,15 @@
-.env
 .venv/
 .worktrees/
 __pycache__/
 .pytest_cache/
 *.pyc
+*.tsbuildinfo
+node_modules/
 dist/
 build/
 secrets/
 archive/
 data/
 logs/
+.gemini
+.codex

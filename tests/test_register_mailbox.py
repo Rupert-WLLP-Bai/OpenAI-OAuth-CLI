@@ -4,7 +4,6 @@ import asyncio
 from typing import Any
 
 import aiohttp
-
 import pytest
 
 from openai_auth_core.mailbox import MailAccountLike
@@ -31,11 +30,7 @@ def test_register_provider_ignores_codes_that_existed_before_prime() -> None:
             super().__init__(api_base="https://example.invalid")
             self.responses = [[old_message], [old_message, new_message]]
 
-        async def fetch_messages(
-            self,
-            session: aiohttp.ClientSession,
-            account: MailAccountLike,
-        ) -> list[dict[str, Any]]:
+        async def fetch_messages(self, session: aiohttp.ClientSession, account: MailAccountLike) -> list[dict[str, Any]]:
             return self.responses.pop(0)
 
     account = MailAccountRecord(email="user@example.com", mail_client_id="client", mail_refresh_token="token")
@@ -52,11 +47,7 @@ def test_register_provider_does_not_sleep_past_remaining_timeout(monkeypatch: py
     sleep_calls: list[float] = []
 
     class StubProvider(register_mailbox.Wyx66Provider):
-        async def fetch_messages(
-            self,
-            session: aiohttp.ClientSession,
-            account: MailAccountLike,
-        ) -> list[dict[str, Any]]:
+        async def fetch_messages(self, session: aiohttp.ClientSession, account: MailAccountLike) -> list[dict[str, Any]]:
             return []
 
     async def fake_sleep(delay: float) -> None:

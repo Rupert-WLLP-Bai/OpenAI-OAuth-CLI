@@ -7,16 +7,14 @@ import os
 from pathlib import Path
 import sqlite3
 import sys
-from typing import Literal
+from typing import Literal, cast
 import webbrowser
-
-from dotenv import load_dotenv
 
 from .accounts_db import AccountStore
 from .admin_server import LocalAccountAdminServer
 from .browser import PatchrightBrowser
 from .callback import CallbackServer
-from .mailbox import DEFAULT_ACCOUNTS_FILE, create_mail_provider
+from .mailbox import DEFAULT_ACCOUNTS_FILE, DEFAULT_PASSWORD, create_mail_provider
 from .oauth import (
     build_auth_url,
     build_callback_url,
@@ -27,7 +25,6 @@ from .oauth import (
 from .state_machine import LoginStateMachine
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "data" / "accounts.sqlite3"
-PASSWORD_ENV_VAR = "OPENAI_ACCOUNT_PASSWORD"
 MailProviderChoice = Literal["auto", "wyx66", "graph"]
 
 
@@ -37,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     login = subparsers.add_parser("login", help="Automate login and print a refresh token")
     login.add_argument("--email", required=True, help="OpenAI account email address")
-    login.add_argument("--password", help=f"OpenAI account password. Defaults to ${PASSWORD_ENV_VAR} from .env when omitted.")
+    login.add_argument("--password", default=DEFAULT_PASSWORD, help="OpenAI account password")
     login.add_argument("--db-path", default=str(DEFAULT_DB_PATH), help="Path to the SQLite database")
     login.add_argument(
         "--accounts-file",
@@ -93,16 +90,6 @@ def resolve_proxy(proxy: str | None) -> str | None:
         if value:
             return value.strip()
     return None
-
-
-def resolve_password(password: str | None) -> str:
-    if password and password.strip():
-        return password
-    load_dotenv(dotenv_path=Path.cwd() / ".env")
-    env_password = os.getenv(PASSWORD_ENV_VAR, "").strip()
-    if env_password:
-        return env_password
-    raise RuntimeError(f"account password is required. Pass --password or set {PASSWORD_ENV_VAR}.")
 
 
 def _missing_login_db_message(db_path: Path) -> str:
@@ -300,17 +287,16 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     try:
-        password = resolve_password(args.password)
         refresh_token = asyncio.run(
             run_login(
                 email=args.email,
-                password=password,
+                password=args.password,
                 accounts_file=args.accounts_file,
                 db_path=args.db_path,
                 callback_port=args.callback_port,
                 timeout=args.timeout,
                 proxy=args.proxy,
-                mail_provider=args.mail_provider,
+                mail_provider=cast(MailProviderChoice, args.mail_provider),
             )
         )
     except KeyboardInterrupt:

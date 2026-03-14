@@ -6,65 +6,11 @@ from unittest.mock import ANY, AsyncMock
 import pytest
 
 from openai_register import cli
+from openai_register.mailbox import DEFAULT_PASSWORD
 from openai_register.models import MailAccountRecord
 
 
-def test_register_command_reads_password_from_dotenv(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-) -> None:
-    captured_args: dict[str, object] = {}
-
-    async def fake_run_register(**kwargs: object) -> str:
-        captured_args.update(kwargs)
-        return "user@example.com"
-
-    (tmp_path / ".env").write_text(f"{cli.PASSWORD_ENV_VAR}=dotenv-password\n", encoding="utf-8")
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(cli, "run_register", fake_run_register)
-    monkeypatch.delenv(cli.PASSWORD_ENV_VAR, raising=False)
-
-    exit_code = cli.main(
-        [
-            "register",
-            "--email",
-            "user@example.com",
-            "--db-path",
-            "/tmp/accounts.sqlite3",
-        ]
-    )
-
-    _ = capsys.readouterr()
-    assert exit_code == 0
-    assert captured_args["password"] == "dotenv-password"
-
-
-def test_register_command_requires_password_when_flag_and_env_missing(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    monkeypatch.delenv(cli.PASSWORD_ENV_VAR, raising=False)
-
-    exit_code = cli.main(
-        [
-            "register",
-            "--email",
-            "user@example.com",
-            "--db-path",
-            "/tmp/accounts.sqlite3",
-        ]
-    )
-
-    captured = capsys.readouterr()
-    assert exit_code == 1
-    assert captured.out == ""
-    assert captured.err == (
-        f"account password is required. Pass --password or set {cli.PASSWORD_ENV_VAR}.\n"
-    )
-
-
-def test_register_command_forwards_mail_provider_choice(
+def test_register_command_uses_default_password(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -83,16 +29,12 @@ def test_register_command_forwards_mail_provider_choice(
             "user@example.com",
             "--db-path",
             "/tmp/accounts.sqlite3",
-            "--password",
-            "pw",
-            "--mail-provider",
-            "graph",
         ]
     )
 
     _ = capsys.readouterr()
     assert exit_code == 0
-    assert captured_args["mail_provider"] == "graph"
+    assert captured_args["password"] == DEFAULT_PASSWORD
 
 
 def test_register_command_prints_success_message(
@@ -208,12 +150,6 @@ def test_run_register_marks_started_then_success(monkeypatch: pytest.MonkeyPatch
         async def prime_inbox(self, *, account: MailAccountRecord) -> None:
             calls.append(("prime_inbox", account.email))
 
-    async def fake_verify_registered_account(**kwargs: object) -> None:
-        calls.append(("verify_registered_account", kwargs["email"]))
-
-    monkeypatch.setattr(cli, "RegistrationAccountStore", FakeStore)
-    monkeypatch.setattr(cli, "PatchrightBrowser", FakeBrowser)
-    monkeypatch.setattr(cli, "RegistrationStateMachine", FakeMachine)
     def fake_create_mail_provider(
         account: object,
         *,
@@ -223,6 +159,12 @@ def test_run_register_marks_started_then_success(monkeypatch: pytest.MonkeyPatch
         calls.append(("create_mail_provider", provider_choice))
         return FakeProvider(proxy=proxy)
 
+    async def fake_verify_registered_account(**kwargs: object) -> None:
+        calls.append(("verify_registered_account", kwargs["email"]))
+
+    monkeypatch.setattr(cli, "RegistrationAccountStore", FakeStore)
+    monkeypatch.setattr(cli, "PatchrightBrowser", FakeBrowser)
+    monkeypatch.setattr(cli, "RegistrationStateMachine", FakeMachine)
     monkeypatch.setattr(cli, "create_mail_provider", fake_create_mail_provider)
     monkeypatch.setattr(cli, "verify_registered_account", fake_verify_registered_account)
 
@@ -319,21 +261,20 @@ def test_run_register_marks_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: P
         async def prime_inbox(self, *, account: MailAccountRecord) -> None:
             calls.append(("prime_inbox", account.email))
 
-    async def fake_verify_registered_account(**kwargs: object) -> None:
-        calls.append(("verify_registered_account", kwargs["email"]))
-
-    monkeypatch.setattr(cli, "RegistrationAccountStore", FakeStore)
-    monkeypatch.setattr(cli, "PatchrightBrowser", FakeBrowser)
-    monkeypatch.setattr(cli, "RegistrationStateMachine", FakeMachine)
     def fake_create_mail_provider(
         account: object,
         *,
         provider_choice: str = "auto",
         proxy: str | None = None,
     ) -> FakeProvider:
-        calls.append(("create_mail_provider", provider_choice))
         return FakeProvider(proxy=proxy)
 
+    async def fake_verify_registered_account(**kwargs: object) -> None:
+        calls.append(("verify_registered_account", kwargs["email"]))
+
+    monkeypatch.setattr(cli, "RegistrationAccountStore", FakeStore)
+    monkeypatch.setattr(cli, "PatchrightBrowser", FakeBrowser)
+    monkeypatch.setattr(cli, "RegistrationStateMachine", FakeMachine)
     monkeypatch.setattr(cli, "create_mail_provider", fake_create_mail_provider)
     monkeypatch.setattr(cli, "verify_registered_account", fake_verify_registered_account)
 
@@ -352,7 +293,6 @@ def test_run_register_marks_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 
     assert calls == [
         ("mark_started", "user@example.com"),
-        ("create_mail_provider", "auto"),
         ("prime_inbox", "user@example.com"),
         ("capture_debug_artifacts", "register-failure"),
         ("mark_failed", ("user@example.com", "verification timed out")),
@@ -424,21 +364,20 @@ def test_run_register_marks_failure_when_post_registration_verification_fails(
         async def prime_inbox(self, *, account: MailAccountRecord) -> None:
             calls.append(("prime_inbox", account.email))
 
-    async def fake_verify_registered_account(**kwargs: object) -> None:
-        raise RuntimeError("strict login verification failed")
-
-    monkeypatch.setattr(cli, "RegistrationAccountStore", FakeStore)
-    monkeypatch.setattr(cli, "PatchrightBrowser", FakeBrowser)
-    monkeypatch.setattr(cli, "RegistrationStateMachine", FakeMachine)
     def fake_create_mail_provider(
         account: object,
         *,
         provider_choice: str = "auto",
         proxy: str | None = None,
     ) -> FakeProvider:
-        calls.append(("create_mail_provider", provider_choice))
         return FakeProvider(proxy=proxy)
 
+    async def fake_verify_registered_account(**kwargs: object) -> None:
+        raise RuntimeError("strict login verification failed")
+
+    monkeypatch.setattr(cli, "RegistrationAccountStore", FakeStore)
+    monkeypatch.setattr(cli, "PatchrightBrowser", FakeBrowser)
+    monkeypatch.setattr(cli, "RegistrationStateMachine", FakeMachine)
     monkeypatch.setattr(cli, "create_mail_provider", fake_create_mail_provider)
     monkeypatch.setattr(cli, "verify_registered_account", fake_verify_registered_account)
 
@@ -457,7 +396,6 @@ def test_run_register_marks_failure_when_post_registration_verification_fails(
 
     assert calls == [
         ("mark_started", "user@example.com"),
-        ("create_mail_provider", "auto"),
         ("prime_inbox", "user@example.com"),
         ("capture_debug_artifacts", "register-failure"),
         ("mark_failed", ("user@example.com", "strict login verification failed")),

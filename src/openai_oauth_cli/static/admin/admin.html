@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>账号管理系统</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/admin/admin.css">
+    <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js" defer></script>
+    <script src="/static/admin/admin.js" defer></script>
+  </head>
+  <body class="workspace-body">
+    <div id="loading-overlay" class="loading-overlay" aria-live="polite">
+      <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+      <span>加载中...</span>
+    </div>
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+    <div class="app-shell container-fluid px-3 py-3">
+      <header class="topbar d-flex flex-column flex-xxl-row justify-content-between gap-3 mb-3">
+        <div class="brand-block pe-xxl-4">
+          <h1 class="page-title">账号管理系统</h1>
+          <p class="page-subtitle">分组、筛选、收件箱查看和验证码处理工作台</p>
+        </div>
+        <div class="topbar-stats d-flex flex-wrap gap-3 justify-content-xxl-end">
+          <div class="stat-card card border-0 shadow-sm">
+            <span class="stat-label">账号总数</span>
+            <strong id="stat-total" class="stat-value">0</strong>
+          </div>
+          <div class="stat-card card border-0 shadow-sm">
+            <span class="stat-label">已注册</span>
+            <strong id="stat-registered" class="stat-value">0</strong>
+          </div>
+          <div class="stat-card card border-0 shadow-sm">
+            <span class="stat-label">主账号</span>
+            <strong id="stat-primary" class="stat-value">0</strong>
+          </div>
+          <button id="export-button" class="btn btn-outline-secondary topbar-action" type="button">导出 JSON</button>
+        </div>
+      </header>
+
+      <div class="workspace">
+        <aside class="workspace-rail account-rail" aria-label="账号列表">
+          <section class="card border-0 shadow-sm h-100 workspace-panel rail-panel">
+            <div class="card-body d-flex flex-column gap-3">
+              <div class="rail-header d-flex justify-content-between align-items-start gap-3">
+                <div>
+                  <h2 class="panel-title h5 mb-1">账号</h2>
+                  <p class="panel-subtitle mb-0">按邮箱筛选并选择要操作的账号</p>
+                </div>
+                <button id="refresh-accounts" class="btn btn-outline-secondary btn-sm" type="button">刷新</button>
+              </div>
+
+              <div class="search-stack d-flex flex-column gap-2">
+                <input id="account-search" class="search-box form-control" type="search" placeholder="搜索邮箱..." autocomplete="off">
+                <div class="filter-row row g-2">
+                  <div class="col-6">
+                    <select id="group-filter" class="form-select" aria-label="按分组筛选">
+                      <option value="">所有分组</option>
+                    </select>
+                  </div>
+                  <div class="col-6">
+                    <select id="status-filter" class="form-select" aria-label="按注册状态筛选">
+                      <option value="">所有状态</option>
+                      <option value="registered">已注册</option>
+                      <option value="unregistered">未注册</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="utility-row d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                <div class="form-check m-0">
+                  <input id="select-page-checkbox" class="form-check-input" type="checkbox">
+                  <label class="form-check-label small text-secondary" for="select-page-checkbox">全选本页</label>
+                </div>
+                <button id="show-import" class="btn btn-outline-secondary btn-sm" type="button">导入</button>
+              </div>
+
+              <div id="batch-selection-bar" class="batch-selection-bar hidden">
+                <span id="selected-count" class="fw-semibold">已选 0 项</span>
+                <div class="batch-selection-actions d-flex gap-2 flex-wrap">
+                  <button id="open-batch-group-button" class="btn btn-primary btn-sm" type="button">加入分组</button>
+                  <button id="clear-selection-button" class="btn btn-outline-secondary btn-sm" type="button">清空选择</button>
+                </div>
+              </div>
+
+              <div id="account-list" class="account-list" role="listbox" aria-label="账号列表"></div>
+
+              <div class="rail-footer d-flex flex-column gap-2 pt-2 mt-auto">
+                <div class="pagination-controls d-flex flex-wrap align-items-center gap-2">
+                  <button id="first-page" class="btn btn-outline-secondary btn-sm" type="button">首页</button>
+                  <button id="prev-page" class="btn btn-outline-secondary btn-sm" type="button">上一页</button>
+                  <div id="account-page-list" class="account-page-list d-flex flex-wrap align-items-center gap-2" aria-label="账号分页"></div>
+                  <button id="next-page" class="btn btn-outline-secondary btn-sm" type="button">下一页</button>
+                  <button id="last-page" class="btn btn-outline-secondary btn-sm" type="button">末页</button>
+                </div>
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                  <div id="account-page-summary" class="panel-subtitle mb-0">第 1 / 1 页</div>
+                  <div id="total-count" class="panel-subtitle mb-0">共 0 条</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </aside>
+
+        <main class="workspace-main" aria-label="收件箱工作区">
+          <section id="account-context-strip" class="card border-0 shadow-sm context-strip">
+            <div class="card-body d-flex flex-column flex-xl-row justify-content-between gap-3">
+              <div class="context-identity d-flex flex-column gap-1">
+                <span class="context-label text-secondary small">当前账号</span>
+                <strong id="context-email" class="context-value">请从左侧选择一个账号</strong>
+              </div>
+              <div class="context-meta d-flex flex-wrap gap-2 align-items-start">
+                <span id="context-group" class="meta-pill badge rounded-pill text-bg-light border">分组: -</span>
+                <span id="context-status" class="meta-pill badge rounded-pill text-bg-light border">状态: -</span>
+                <span id="context-primary" class="meta-pill badge rounded-pill text-bg-light border">主账号: -</span>
+                <span id="context-updated" class="meta-pill badge rounded-pill text-bg-light border">最后更新: -</span>
+              </div>
+            </div>
+          </section>
+
+          <section id="inbox-panel" class="card border-0 shadow-sm inbox-panel">
+            <div class="card-body d-flex flex-column gap-3 min-h-0">
+              <div class="panel-header d-flex flex-column flex-xxl-row justify-content-between gap-3">
+                <div>
+                  <h2 class="panel-title h5 mb-1">收件箱</h2>
+                  <p id="inbox-meta" class="panel-subtitle mb-0">选中账号后显示邮件和验证码</p>
+                </div>
+                <div class="toolbar-actions d-flex flex-wrap justify-content-xxl-end align-items-center gap-2">
+                  <div id="inbox-loading-indicator" class="loading-indicator small text-secondary hidden" aria-live="polite">加载邮件中</div>
+                  <div class="btn-group btn-group-sm segmented-control" role="tablist" aria-label="邮件筛选">
+                    <button id="all-mail-filter" class="btn btn-outline-primary active" type="button">全部</button>
+                    <button id="verification-only-filter" class="btn btn-outline-primary" type="button">仅验证码</button>
+                  </div>
+                  <div id="inbox-pagination" class="mini-pagination hidden d-flex align-items-center gap-2" aria-label="邮件分页">
+                    <button id="inbox-prev" class="btn btn-outline-secondary btn-sm" type="button">上一页</button>
+                    <span id="inbox-page-info" class="small text-secondary">1 / 1</span>
+                    <button id="inbox-next" class="btn btn-outline-secondary btn-sm" type="button">下一页</button>
+                  </div>
+                  <button id="refresh-inbox-btn" class="btn btn-outline-secondary btn-sm" type="button">刷新邮件</button>
+                </div>
+              </div>
+              <div id="inbox-container" class="message-list"></div>
+            </div>
+          </section>
+        </main>
+
+        <aside id="workspace-sidebar" class="workspace-sidebar" aria-label="操作侧栏">
+          <section id="account-status-card" class="card border-0 shadow-sm sidebar-card">
+            <div class="card-body d-flex flex-column gap-3">
+              <div class="panel-header d-flex justify-content-between align-items-start gap-3">
+                <div>
+                  <h2 class="panel-title h5 mb-1">账号状态</h2>
+                  <p class="panel-subtitle mb-0">单账号快捷操作</p>
+                </div>
+              </div>
+              <div class="sidebar-details d-flex flex-column gap-2">
+                <div class="detail-row d-flex justify-content-between gap-3">
+                  <span class="detail-label small text-secondary">邮箱</span>
+                  <strong id="detail-email" class="detail-value text-end">-</strong>
+                </div>
+                <div class="detail-row d-flex justify-content-between gap-3">
+                  <span class="detail-label small text-secondary">分组</span>
+                  <span id="detail-group" class="detail-value text-end">-</span>
+                </div>
+                <div class="detail-row d-flex justify-content-between gap-3">
+                  <span class="detail-label small text-secondary">注册状态</span>
+                  <span id="detail-status" class="detail-value text-end">-</span>
+                </div>
+                <div class="detail-row d-flex justify-content-between gap-3">
+                  <span class="detail-label small text-secondary">主账号</span>
+                  <span id="detail-primary" class="detail-value text-end">-</span>
+                </div>
+                <div class="detail-row d-flex justify-content-between gap-3">
+                  <span class="detail-label small text-secondary">最后更新</span>
+                  <span id="detail-updated" class="detail-value text-end">-</span>
+                </div>
+              </div>
+              <div id="account-quick-actions" class="quick-actions d-flex flex-wrap gap-2 mt-auto">
+                <button id="copy-email-button" class="btn btn-outline-secondary btn-sm" type="button">复制邮箱</button>
+                <button id="sidebar-refresh-inbox-button" class="btn btn-outline-secondary btn-sm" type="button">刷新邮件</button>
+                <button id="change-group-btn" class="btn btn-primary btn-sm" type="button">加入分组</button>
+                <button id="toggle-reg-btn" class="btn btn-outline-secondary btn-sm" type="button">切换注册状态</button>
+                <button id="toggle-pri-btn" class="btn btn-outline-secondary btn-sm" type="button">切换主账号</button>
+              </div>
+            </div>
+          </section>
+
+          <section id="mailbox-summary-card" class="card border-0 shadow-sm sidebar-card">
+            <div class="card-body d-flex flex-column gap-3">
+              <div class="panel-header d-flex justify-content-between align-items-start gap-3">
+                <div>
+                  <h2 class="panel-title h5 mb-1">验证码与摘要</h2>
+                  <p class="panel-subtitle mb-0">展示最近 3 个验证码</p>
+                </div>
+              </div>
+              <div class="summary-metrics d-flex flex-column gap-2">
+                <div class="detail-row d-flex justify-content-between gap-3">
+                  <span class="detail-label small text-secondary">当前邮件数</span>
+                  <span id="mailbox-message-count" class="detail-value text-end">0</span>
+                </div>
+                <div class="detail-row d-flex justify-content-between gap-3">
+                  <span class="detail-label small text-secondary">验证码邮件</span>
+                  <span id="verification-message-count" class="detail-value text-end">0</span>
+                </div>
+                <div class="detail-row d-flex justify-content-between gap-3">
+                  <span class="detail-label small text-secondary">最近一封</span>
+                  <span id="latest-message-time" class="detail-value text-end">-</span>
+                </div>
+              </div>
+              <div class="summary-list-block d-flex flex-column gap-2 min-h-0">
+                <span class="detail-label small text-secondary">最近验证码</span>
+                <div id="latest-code-list" class="latest-code-list"></div>
+              </div>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </div>
+
+    <div id="import-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="import-title">
+      <div class="modal-panel card border-0 shadow">
+        <div class="card-body">
+          <div class="modal-header d-flex justify-content-between align-items-start gap-3">
+            <div>
+              <h2 id="import-title" class="panel-title h5 mb-1">导入账号</h2>
+              <p class="panel-subtitle mb-0">请输入原始文本行，每行一个账号。</p>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-close-modal="import-overlay">关闭</button>
+          </div>
+          <textarea id="import-textarea" class="modal-textarea form-control mt-3" placeholder="粘贴账号数据..."></textarea>
+          <div class="modal-footer d-flex justify-content-end gap-2 mt-3">
+            <button class="btn btn-outline-secondary" type="button" data-close-modal="import-overlay">取消</button>
+            <button id="import-button" class="btn btn-primary" type="button">开始导入</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="group-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="group-title">
+      <div class="modal-panel card border-0 shadow">
+        <div class="card-body">
+          <div class="modal-header d-flex justify-content-between align-items-start gap-3">
+            <div>
+              <h2 id="group-title" class="panel-title h5 mb-1">加入分组</h2>
+              <p id="group-target-description" class="panel-subtitle mb-0">未选择账号</p>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-close-modal="group-overlay">关闭</button>
+          </div>
+          <label class="field-stack d-flex flex-column gap-2 mt-3" for="group-name-input">
+            <span class="detail-label small text-secondary">分组名</span>
+            <input id="group-name-input" class="form-control" type="text" autocomplete="off" placeholder="搜索已有分组或输入新分组名">
+          </label>
+          <div class="field-stack d-flex flex-column gap-2 mt-3">
+            <span class="detail-label small text-secondary">匹配结果</span>
+            <div id="group-match-list" class="group-match-list"></div>
+          </div>
+          <div class="field-stack d-flex flex-column gap-2 mt-3">
+            <span class="detail-label small text-secondary">预览</span>
+            <p id="group-preview" class="group-preview mb-0">输入分组后在这里预览操作</p>
+          </div>
+          <div class="modal-footer d-flex justify-content-end gap-2 mt-3">
+            <button class="btn btn-outline-secondary" type="button" data-close-modal="group-overlay">取消</button>
+            <button id="apply-group-button" class="btn btn-primary" type="button" disabled>加入分组</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

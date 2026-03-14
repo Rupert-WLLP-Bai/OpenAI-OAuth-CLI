@@ -1,0 +1,318 @@
+:root {
+  /* Modern Alabaster Palette (Linear/Vercel Inspired) */
+  --bg-app: #f8fafc;
+  --bg-panel: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --bg-modal: rgba(15, 23, 42, 0.4);
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  --accent: #6366f1; /* Indigo 500 */
+  --accent-soft: rgba(99, 102, 241, 0.08);
+  --success: #10b981;
+  --error: #ef4444;
+  --border-subtle: #e2e8f0;
+  --border-focus: #cbd5e1;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.12);
+  --shadow-lg: 0 10px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --radius-lg: 12px;
+  --radius-md: 8px;
+  --radius-full: 9999px;
+}
+
+/* 1. Global Viewport Control */
+html, body {
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* NO GLOBAL SCROLL */
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-shell {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  gap: 1rem;
+  box-sizing: border-box;
+}
+
+/* 2. Topbar Style */
+.topbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.5rem;
+}
+.brand-block h1 { margin: 0; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
+.brand-block p { margin: 0; font-size: 0.81rem; color: var(--text-muted); }
+
+.topbar-stats { display: flex; gap: 0.75rem; align-items: stretch; }
+.stat-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.85rem;
+  min-width: 90px;
+  box-shadow: var(--shadow-sm);
+}
+.stat-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-value { display: block; font-size: 1rem; font-weight: 600; font-family: "JetBrains Mono", monospace; }
+
+/* 3. Three-Column Grid Setup */
+.workspace {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr) 340px;
+  gap: 1rem;
+  min-height: 0; /* CRITICAL: Allows flex items to shrink below content height */
+}
+
+.workspace-rail,
+.workspace-main,
+.workspace-sidebar {
+  min-height: 0;
+}
+
+/* General Panel Frame */
+.workspace-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  height: 100%;
+}
+
+/* Ensure .card-body from Bootstrap doesn't break our flex */
+.workspace-panel > .card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 !important; /* Managed by children */
+}
+
+/* 4. Left Rail: Accounts */
+.account-rail { height: 100%; }
+
+/* Fixed search/filter area */
+.rail-header-group {
+  flex-shrink: 0;
+  padding: 1.25rem 1rem 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--bg-panel);
+}
+
+/* The REAL Scrollable Account List */
+.account-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-height: 0;
+}
+
+.account-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 0.75rem 0.8rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+  gap: 0.75rem;
+}
+.account-item:hover { background: var(--bg-subtle); }
+.account-item.active { background: var(--accent-soft); border-color: var(--accent); }
+
+.account-checkbox { flex-shrink: 0; margin-top: 0.25rem; width: 16px; height: 16px; accent-color: var(--accent); }
+.account-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.account-email { font-size: 0.875rem; font-weight: 600; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.account-meta-line { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.badge-mini { font-size: 0.625rem; font-weight: 700; padding: 0.1rem 0.35rem; border-radius: 4px; text-transform: uppercase; }
+.badge-reg { background: #dcfce7; color: #166534; }
+.badge-unreg { background: #f1f5f9; color: #64748b; }
+.badge-pri { background: #e0e7ff; color: #3730a3; }
+.badge-group { font-size: 0.7rem; color: var(--text-dim); }
+
+/* Fixed Footer/Pagination */
+.rail-footer {
+  flex-shrink: 0;
+  padding: 1rem 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-panel);
+}
+.pagination-controls { display: flex; justify-content: center; align-items: center; gap: 0.3rem; }
+.pagination-controls .btn { min-width: 32px; height: 32px; padding: 0; border-radius: var(--radius-md); font-size: 0.75rem; }
+#account-page-list .btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* 5. Center Column: Reading Area */
+.workspace-main { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.context-strip { flex-shrink: 0; padding: 1.25rem; background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); }
+.inbox-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.message-list { flex: 1; overflow-y: auto; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; }
+
+/* Message Card Structure */
+.message-card {
+  padding: 1rem 1.25rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.message-card:hover { border-color: var(--border-focus); box-shadow: var(--shadow-sm); }
+.message-card.has-verification { border-left: 3px solid var(--accent); }
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.message-header-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.message-subject {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.message-from {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.message-time {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: right;
+  line-height: 1.4;
+}
+
+.message-body {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-subtle);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Verification Box - Prominent Style */
+.verification-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius-md);
+  margin-top: 0.25rem;
+}
+.verification-content { display: flex; flex-direction: column; gap: 0.125rem; }
+.verification-label { font-size: 0.6875rem; color: #166534; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.verification-code { font-size: 1.5rem; font-weight: 700; font-family: "JetBrains Mono", monospace; color: #15803d; letter-spacing: 0.1em; }
+
+/* 6. Right Sidebar: Controls */
+.workspace-sidebar { display: flex; flex-direction: column; gap: 1rem; height: 100%; min-height: 0; }
+
+#account-status-card {
+  flex-shrink: 0;
+  max-height: 45%;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+  overflow: hidden;
+}
+#account-status-card .sidebar-details { overflow-y: auto; margin-bottom: 1rem; }
+
+#mailbox-summary-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+}
+#mailbox-summary-card .summary-list-block { flex: 1; overflow-y: auto; padding-right: 4px; }
+
+/* Code Display Style */
+.latest-code-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.latest-code-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius-md);
+  padding: 0.625rem 0.875rem;
+}
+.latest-code-item strong {
+  font-size: 1.25rem;
+  font-family: "JetBrains Mono", monospace;
+  color: #15803d;
+  letter-spacing: 0.08em;
+}
+.latest-code-meta { font-size: 0.6875rem; color: var(--text-dim); margin-top: 0.25rem; }
+
+/* 7. Floating Command Bar (Bottom Center) */
+.batch-selection-bar {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--text-main);
+  color: #fff;
+  border-radius: var(--radius-full);
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.2);
+  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes popIn { from { transform: translate(-50%, 100px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+/* 8. Fix Stuck Loading/Overlay */
+.loading-overlay { position: fixed; inset: 0; z-index: 2000; display: none; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(4px); color: var(--accent); font-weight: 600; }
+.loading-overlay.visible { display: flex; }
+
+.overlay { position: fixed; inset: 0; z-index: 1060; display: none; align-items: center; justify-content: center; background: var(--bg-modal); backdrop-filter: blur(4px); padding: 1rem; }
+.overlay:not(.hidden) { display: flex; }
+
+.toast-container { position: fixed; top: 1.5rem; right: 1.5rem; z-index: 2100; display: flex; flex-direction: column; gap: 0.75rem; }
+.toast { min-width: 280px; padding: 1rem 1.25rem; background: var(--bg-panel); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); color: var(--text-main); border-left: 4px solid var(--accent); }
+.toast.success { border-left-color: var(--success); }
+.toast.error { border-left-color: var(--error); }
+
+.hidden { display: none !important; }
+.empty-state { padding: 2rem 1rem; text-align: center; color: var(--text-dim); font-size: 0.875rem; }
+
+/* Scrollbar Polishing */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background-color: var(--border-subtle); border-radius: 10px; }
+::-webkit-scrollbar-track { background: transparent; }

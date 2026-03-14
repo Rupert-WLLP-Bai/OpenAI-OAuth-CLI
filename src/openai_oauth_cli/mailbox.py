@@ -16,8 +16,8 @@ from openai_auth_core.mailbox import (
 from .models import AccountRecord
 
 
-PASSWORD_ENV_VAR = "OPENAI_ACCOUNT_PASSWORD"
-DEFAULT_ACCOUNTS_FILE = Path(__file__).resolve().parents[2] / "secrets" / "example_accounts.txt"
+DEFAULT_PASSWORD = "C.WLLP159357"
+DEFAULT_ACCOUNTS_FILE = Path(__file__).resolve().parents[2] / "secrets" / "openai_mail_accounts_2026-03-10.txt"
 
 
 class VerificationCodeProvider(Protocol):
@@ -64,10 +64,10 @@ def find_account_by_email(accounts: Iterable[AccountRecord], email: str) -> Acco
 
 __all__ = [
     "DEFAULT_ACCOUNTS_FILE",
+    "DEFAULT_PASSWORD",
     "GRAPH_API_BASE",
     "GraphApiProvider",
     "MAIL_POLL_INTERVAL_SECONDS",
-    "PASSWORD_ENV_VAR",
     "VerificationCodeProvider",
     "WYX66_API_BASE",
     "Wyx66Provider",

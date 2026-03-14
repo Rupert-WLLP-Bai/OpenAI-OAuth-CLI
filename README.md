@@ -10,7 +10,7 @@ Python CLIs for:
 ## What It Does
 
 - accepts an OpenAI account email address
-- reads the account password from `--password` or `OPENAI_ACCOUNT_PASSWORD`
+- uses a project-wide default password unless `--password` is provided
 - launches a `patchright` browser session
 - drives the login flow through a page-state machine
 - looks up mailbox metadata from a local SQLite database
@@ -26,7 +26,7 @@ Initialize the database, sync mailbox metadata from one or more txt exports, and
 uv run openai-oauth-cli db init --db-path data/accounts.sqlite3
 uv run openai-oauth-cli db import-txt \
   --db-path data/accounts.sqlite3 \
-  --txt-path secrets/example_accounts.txt
+  --txt-path secrets/openai_mail_accounts_2026-03-10.txt
 uv run openai-oauth-cli db summary --db-path data/accounts.sqlite3
 ```
 
@@ -54,8 +54,8 @@ Repeat `--txt-path` to sync multiple files in order:
 ```bash
 uv run openai-oauth-cli db import-txt \
   --db-path data/accounts.sqlite3 \
-  --txt-path secrets/example_accounts.txt \
-  --txt-path secrets/example_accounts_extra.txt
+  --txt-path secrets/openai_mail_accounts_2026-03-10.txt \
+  --txt-path secrets/openai_mail_accounts_2026-03-11.txt
 ```
 
 If you want to inspect those flags directly, query the SQLite database:
@@ -64,24 +64,6 @@ If you want to inspect those flags directly, query the SQLite database:
 sqlite3 data/accounts.sqlite3 \
   "SELECT email, is_registered, is_primary FROM accounts ORDER BY lower(email);"
 ```
-
-## Password Configuration
-
-The CLIs read the password from `--password` or `OPENAI_ACCOUNT_PASSWORD`.
-
-For local development, keep the real value in `.env` and keep `.env.example` checked in without secrets:
-
-```dotenv
-# .env
-OPENAI_ACCOUNT_PASSWORD=your-password
-```
-
-```dotenv
-# .env.example
-OPENAI_ACCOUNT_PASSWORD=
-```
-
-The CLIs load `.env` from the current working directory with `python-dotenv`, so keeping the real value in a local `.env` file is enough for normal development.
 
 ## Local Account Admin
 
@@ -155,7 +137,7 @@ Both CLIs force a headed browser session. There is no `--headless` mode.
 
 ## Defaults
 
-- password source: `--password` or `OPENAI_ACCOUNT_PASSWORD`
+- default password: `C.WLLP159357`
 - default database path: `data/accounts.sqlite3`
 - `db import-txt` requires at least one explicit `--txt-path`
 

@@ -263,7 +263,7 @@ class AccountStore:
         query: str = "",
         group_name: str | None = None,
         is_registered: bool | None = None,
-        limit: int = 50,
+        limit: int = 25,
         offset: int = 0,
     ) -> dict[str, object]:
         where_clauses: list[str] = []

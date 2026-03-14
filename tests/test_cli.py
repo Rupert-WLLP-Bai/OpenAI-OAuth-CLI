@@ -10,6 +10,7 @@ import pytest
 from openai_oauth_cli import cli
 from openai_oauth_cli.accounts_db import AccountStore
 from openai_oauth_cli.callback import CallbackResult
+from openai_oauth_cli.mailbox import DEFAULT_PASSWORD
 from openai_oauth_cli.models import AccountRecord, TokenBundle
 
 
@@ -25,63 +26,21 @@ def test_login_command_prints_refresh_token(monkeypatch: pytest.MonkeyPatch, cap
     run_login.assert_awaited_once()
 
 
-def test_login_command_reads_password_from_dotenv(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-) -> None:
+def test_login_command_uses_default_password(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     captured_args: dict[str, object] = {}
 
     async def fake_run_login(**kwargs: object) -> str:
         captured_args.update(kwargs)
         return "rt_example"
 
-    (tmp_path / ".env").write_text(f"{cli.PASSWORD_ENV_VAR}=dotenv-password\n", encoding="utf-8")
-    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(cli, "run_login", fake_run_login)
-    monkeypatch.delenv(cli.PASSWORD_ENV_VAR, raising=False)
 
     exit_code = cli.main(["login", "--email", "user@example.com"])
 
     _ = capsys.readouterr()
     assert exit_code == 0
-    assert captured_args["password"] == "dotenv-password"
+    assert captured_args["password"] == DEFAULT_PASSWORD
     assert captured_args["db_path"] == str(cli.DEFAULT_DB_PATH)
-
-
-def test_login_command_forwards_mail_provider_choice(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    captured_args: dict[str, object] = {}
-
-    async def fake_run_login(**kwargs: object) -> str:
-        captured_args.update(kwargs)
-        return "rt_example"
-
-    monkeypatch.setattr(cli, "run_login", fake_run_login)
-
-    exit_code = cli.main(["login", "--email", "user@example.com", "--password", "pw", "--mail-provider", "graph"])
-
-    _ = capsys.readouterr()
-    assert exit_code == 0
-    assert captured_args["mail_provider"] == "graph"
-
-
-def test_login_command_requires_password_when_flag_and_env_missing(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    monkeypatch.delenv(cli.PASSWORD_ENV_VAR, raising=False)
-
-    exit_code = cli.main(["login", "--email", "user@example.com"])
-
-    captured = capsys.readouterr()
-    assert exit_code == 1
-    assert captured.out == ""
-    assert captured.err == (
-        f"account password is required. Pass --password or set {cli.PASSWORD_ENV_VAR}.\n"
-    )
 
 
 def test_login_command_reports_missing_or_uninitialized_db(
@@ -90,7 +49,7 @@ def test_login_command_reports_missing_or_uninitialized_db(
 ) -> None:
     db_path = tmp_path / "accounts.sqlite3"
 
-    exit_code = cli.main(["login", "--email", "user@example.com", "--password", "pw", "--db-path", str(db_path)])
+    exit_code = cli.main(["login", "--email", "user@example.com", "--db-path", str(db_path)])
 
     captured = capsys.readouterr()
     assert exit_code == 1
@@ -110,7 +69,7 @@ def test_login_command_reports_empty_initialized_db_with_import_guidance(
     db_path = tmp_path / "accounts.sqlite3"
     AccountStore(db_path).init_db()
 
-    exit_code = cli.main(["login", "--email", "user@example.com", "--password", "pw", "--db-path", str(db_path)])
+    exit_code = cli.main(["login", "--email", "user@example.com", "--db-path", str(db_path)])
 
     captured = capsys.readouterr()
     assert exit_code == 1
@@ -268,6 +227,15 @@ def test_run_login_loads_account_from_sqlite_db(tmp_path: Path, monkeypatch: pyt
         async def prime_inbox(self, *, account: AccountRecord) -> None:
             captured["primed_account"] = account.email
 
+    def fake_create_mail_provider(
+        account: object,
+        *,
+        provider_choice: str = "auto",
+        proxy: str | None = None,
+    ) -> FakeProvider:
+        captured["provider_choice"] = provider_choice
+        return FakeProvider(proxy=proxy)
+
     async def fake_exchange_code_for_tokens(
         *,
         code: str,
@@ -284,15 +252,6 @@ def test_run_login_loads_account_from_sqlite_db(tmp_path: Path, monkeypatch: pyt
     monkeypatch.setattr(cli, "CallbackServer", FakeCallbackServer)
     monkeypatch.setattr(cli, "PatchrightBrowser", FakeBrowser)
     monkeypatch.setattr(cli, "LoginStateMachine", FakeLoginStateMachine)
-    def fake_create_mail_provider(
-        account: object,
-        *,
-        provider_choice: str = "auto",
-        proxy: str | None = None,
-    ) -> FakeProvider:
-        captured["provider_choice"] = provider_choice
-        return FakeProvider(proxy=proxy)
-
     monkeypatch.setattr(cli, "create_mail_provider", fake_create_mail_provider)
     monkeypatch.setattr(cli, "exchange_code_for_tokens", fake_exchange_code_for_tokens)
     monkeypatch.setattr(cli, "make_pkce_material", lambda: ("code-verifier-123", "challenge-123", "state-123"))
@@ -318,7 +277,6 @@ def test_run_login_loads_account_from_sqlite_db(tmp_path: Path, monkeypatch: pyt
     assert captured["email"] == "user@example.com"
     assert captured["password"] == "pw"
     assert captured["timeout"] == 30
-    assert captured["provider_choice"] == "auto"
     assert captured["primed_account"] == "user@example.com"
 
 

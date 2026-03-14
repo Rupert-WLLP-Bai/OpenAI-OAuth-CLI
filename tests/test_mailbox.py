@@ -4,12 +4,11 @@ import asyncio
 from typing import Any
 
 import aiohttp
-
 import pytest
 
 from openai_auth_core.mailbox import MailAccountLike
 from openai_oauth_cli.models import AccountRecord
-from openai_oauth_cli.mailbox import DEFAULT_ACCOUNTS_FILE, find_account_by_email, parse_accounts_text
+from openai_oauth_cli.mailbox import DEFAULT_PASSWORD, find_account_by_email, parse_accounts_text
 from openai_oauth_cli import mailbox as oauth_mailbox
 
 
@@ -43,8 +42,8 @@ def test_find_account_by_email_requires_unique_match() -> None:
         raise AssertionError("expected duplicate account lookup to fail")
 
 
-def test_default_accounts_file_uses_generic_public_example_name() -> None:
-    assert DEFAULT_ACCOUNTS_FILE.as_posix().endswith("secrets/example_accounts.txt")
+def test_default_password_is_hardcoded() -> None:
+    assert DEFAULT_PASSWORD == "C.WLLP159357"
 
 
 def test_wyx66_provider_ignores_codes_that_existed_before_prime() -> None:
@@ -66,11 +65,7 @@ def test_wyx66_provider_ignores_codes_that_existed_before_prime() -> None:
             super().__init__(api_base="https://example.invalid")
             self.responses = [[old_message], [old_message, new_message]]
 
-        async def fetch_messages(
-            self,
-            session: aiohttp.ClientSession,
-            account: MailAccountLike,
-        ) -> list[dict[str, Any]]:
+        async def fetch_messages(self, session: aiohttp.ClientSession, account: MailAccountLike) -> list[dict[str, Any]]:
             return self.responses.pop(0)
 
     account = AccountRecord(email="user@example.com", mail_client_id="client", mail_refresh_token="token")
@@ -87,11 +82,7 @@ def test_wyx66_provider_does_not_sleep_past_remaining_timeout(monkeypatch: pytes
     sleep_calls: list[float] = []
 
     class StubProvider(oauth_mailbox.Wyx66Provider):
-        async def fetch_messages(
-            self,
-            session: aiohttp.ClientSession,
-            account: MailAccountLike,
-        ) -> list[dict[str, Any]]:
+        async def fetch_messages(self, session: aiohttp.ClientSession, account: MailAccountLike) -> list[dict[str, Any]]:
             return []
 
     async def fake_sleep(delay: float) -> None:
