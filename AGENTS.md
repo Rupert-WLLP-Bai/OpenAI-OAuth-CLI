@@ -80,11 +80,11 @@ rsync -a --delete \
   --exclude 'secrets/' \
   --exclude 'logs/' \
   --exclude '*.sqlite3' \
-  /home/pejoy/code/draft/research/openai-oauth-cli/ \
-  /home/pejoy/code/draft/research/openai-oauth-cli/.worktrees/public-release-sanitized/
+  /path/to/private/repo/ \
+  /path/to/private/repo/.worktrees/public-release-sanitized/
 
 # 2. Verify, commit with the public-safe identity, then push the sanitized branch.
-cd /home/pejoy/code/draft/research/openai-oauth-cli/.worktrees/public-release-sanitized
+cd /path/to/private/repo/.worktrees/public-release-sanitized
 uv sync --group dev
 uv run pytest
 uv run ruff check .
