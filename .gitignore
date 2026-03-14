@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache/
 *.pyc
 *.tsbuildinfo
+.env
 node_modules/
 dist/
 build/

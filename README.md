@@ -10,7 +10,7 @@ Python CLIs for:
 ## What It Does
 
 - accepts an OpenAI account email address
-- uses a project-wide default password unless `--password` is provided
+- reads the account password from `--password` or `OPENAI_ACCOUNT_PASSWORD` in `.env`
 - launches a `patchright` browser session
 - drives the login flow through a page-state machine
 - looks up mailbox metadata from a local SQLite database
@@ -89,6 +89,22 @@ The admin server:
 
 The admin APIs and UI do not expose `mail_refresh_token` by default.
 
+## Password Configuration
+
+Create a local `.env` file before using `login`, `register`, or `verify-login` without `--password`:
+
+```bash
+cp .env.example .env
+```
+
+Set:
+
+```bash
+OPENAI_ACCOUNT_PASSWORD=your-password-here
+```
+
+`--password` still takes precedence when you need to override it for a single run.
+
 ## Login
 
 After the database is initialized and populated, run:
@@ -137,8 +153,8 @@ Both CLIs force a headed browser session. There is no `--headless` mode.
 
 ## Defaults
 
-- default password: `C.WLLP159357`
 - default database path: `data/accounts.sqlite3`
+- password source: `OPENAI_ACCOUNT_PASSWORD` from `.env` or the process environment
 - `db import-txt` requires at least one explicit `--txt-path`
 
 ## Registration Database Requirements

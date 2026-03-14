@@ -7,11 +7,13 @@ from pathlib import Path
 import sys
 from typing import Literal, cast
 
+from openai_auth_core.runtime_config import ACCOUNT_PASSWORD_ENV_VAR, resolve_account_password
+
 from .accounts_db import RegistrationAccountStore
 from .browser import PatchrightBrowser
 from .callback import CallbackServer
 from .diagnostics import RunLogger
-from .mailbox import DEFAULT_PASSWORD, create_mail_provider
+from .mailbox import create_mail_provider
 from .models import MailAccountRecord
 from .oauth import build_auth_url, make_pkce_material, validate_callback_result
 from .state_machine import OAuthLoginVerifier, RegistrationStateMachine
@@ -29,7 +31,11 @@ def build_parser() -> argparse.ArgumentParser:
     register = subparsers.add_parser("register", help="Automate ChatGPT account registration")
     register.add_argument("--email", required=True, help="Account email address")
     register.add_argument("--db-path", required=True, help="SQLite account database path")
-    register.add_argument("--password", default=DEFAULT_PASSWORD, help="Account password")
+    register.add_argument(
+        "--password",
+        default=None,
+        help=f"Account password. Defaults to {ACCOUNT_PASSWORD_ENV_VAR} from .env or the environment.",
+    )
     register.add_argument("--timeout", type=int, default=300)
     register.add_argument("--proxy")
     register.add_argument("--callback-port", type=int, default=DEFAULT_CALLBACK_PORT)
@@ -44,7 +50,11 @@ def build_parser() -> argparse.ArgumentParser:
     verify = subparsers.add_parser("verify-login", help="Verify that an account can complete a real login flow")
     verify.add_argument("--email", required=True, help="Account email address")
     verify.add_argument("--db-path", required=True, help="SQLite account database path")
-    verify.add_argument("--password", default=DEFAULT_PASSWORD, help="Account password")
+    verify.add_argument(
+        "--password",
+        default=None,
+        help=f"Account password. Defaults to {ACCOUNT_PASSWORD_ENV_VAR} from .env or the environment.",
+    )
     verify.add_argument("--timeout", type=int, default=300)
     verify.add_argument("--proxy")
     verify.add_argument("--callback-port", type=int, default=DEFAULT_CALLBACK_PORT)
@@ -217,11 +227,12 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
     try:
+        password = resolve_account_password(args.password)
         if args.command == "register":
             email = asyncio.run(
                 run_register(
                     email=args.email,
-                    password=args.password,
+                    password=password,
                     db_path=args.db_path,
                     timeout=args.timeout,
                     proxy=args.proxy,
@@ -237,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
             email = asyncio.run(
                 run_verify_login(
                     email=args.email,
-                    password=args.password,
+                    password=password,
                     db_path=args.db_path,
                     timeout=args.timeout,
                     proxy=args.proxy,

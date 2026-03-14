@@ -94,6 +94,7 @@ Recommended route:
      --exclude '.venv/' \
      --exclude '.pytest_cache/' \
      --exclude '__pycache__/' \
+     --exclude 'docs/plans/' \
      --exclude 'data/' \
      --exclude 'secrets/' \
      --exclude 'logs/' \
@@ -106,6 +107,7 @@ Recommended route:
    - private email addresses
    - realistic mailbox/account samples
    - local-only file names and paths
+   - private planning docs under `docs/plans/`
 7. Verify again in the sanitized tree:
    - `uv run pytest`
    - `uv run ruff check .`

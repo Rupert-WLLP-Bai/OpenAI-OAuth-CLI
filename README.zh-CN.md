@@ -65,6 +65,22 @@ uv run openai-register register --email you@example.com --db-path data/accounts.
 uv run openai-register verify-login --email you@example.com --db-path data/accounts.sqlite3
 ```
 
+## 密码配置
+
+如果你不想每次都传 `--password`，先在本地创建 `.env`：
+
+```bash
+cp .env.example .env
+```
+
+然后设置：
+
+```bash
+OPENAI_ACCOUNT_PASSWORD=your-password-here
+```
+
+命令行里显式传入 `--password` 时，会优先使用命令行参数。
+
 ## Live E2E
 
 Live E2E 默认跳过，只有在显式设置环境变量后才会运行：
@@ -77,6 +93,7 @@ uv run pytest tests/e2e/test_live_flows.py -m live_e2e -v
 
 ## 安全说明
 
+- 不要提交 `.env`
 - 不要提交 `data/`、`secrets/`、`logs/`、SQLite 数据库、token、代理配置
 - 不要把本地私有历史直接 push 到公开 GitHub
 - 公开版本必须先做脱敏，再单独发布

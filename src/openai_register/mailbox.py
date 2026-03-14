@@ -10,11 +10,7 @@ from openai_auth_core.mailbox import (
     extract_verification_code,
 )
 
-
-DEFAULT_PASSWORD = "C.WLLP159357"
-
 __all__ = [
-    "DEFAULT_PASSWORD",
     "GRAPH_API_BASE",
     "GraphApiProvider",
     "MAIL_POLL_INTERVAL_SECONDS",

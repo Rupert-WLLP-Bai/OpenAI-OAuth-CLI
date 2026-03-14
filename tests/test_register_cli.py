@@ -6,11 +6,10 @@ from unittest.mock import ANY, AsyncMock
 import pytest
 
 from openai_register import cli
-from openai_register.mailbox import DEFAULT_PASSWORD
 from openai_register.models import MailAccountRecord
 
 
-def test_register_command_uses_default_password(
+def test_register_command_uses_password_from_environment(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -20,6 +19,7 @@ def test_register_command_uses_default_password(
         captured_args.update(kwargs)
         return "user@example.com"
 
+    monkeypatch.setenv("OPENAI_ACCOUNT_PASSWORD", "env-password")
     monkeypatch.setattr(cli, "run_register", fake_run_register)
 
     exit_code = cli.main(
@@ -34,7 +34,34 @@ def test_register_command_uses_default_password(
 
     _ = capsys.readouterr()
     assert exit_code == 0
-    assert captured_args["password"] == DEFAULT_PASSWORD
+    assert captured_args["password"] == "env-password"
+
+
+def test_register_command_requires_password_flag_or_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("OPENAI_ACCOUNT_PASSWORD", raising=False)
+
+    exit_code = cli.main(
+        [
+            "register",
+            "--email",
+            "user@example.com",
+            "--db-path",
+            "/tmp/accounts.sqlite3",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    assert captured.err == (
+        "account password is required. "
+        "Pass `--password` or set `OPENAI_ACCOUNT_PASSWORD` in `.env` or the environment.\n"
+    )
 
 
 def test_register_command_prints_success_message(

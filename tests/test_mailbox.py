@@ -8,7 +8,7 @@ import pytest
 
 from openai_auth_core.mailbox import MailAccountLike
 from openai_oauth_cli.models import AccountRecord
-from openai_oauth_cli.mailbox import DEFAULT_PASSWORD, find_account_by_email, parse_accounts_text
+from openai_oauth_cli.mailbox import find_account_by_email, parse_accounts_text
 from openai_oauth_cli import mailbox as oauth_mailbox
 
 
@@ -40,11 +40,6 @@ def test_find_account_by_email_requires_unique_match() -> None:
         assert "multiple accounts" in str(exc)
     else:
         raise AssertionError("expected duplicate account lookup to fail")
-
-
-def test_default_password_is_hardcoded() -> None:
-    assert DEFAULT_PASSWORD == "C.WLLP159357"
-
 
 def test_wyx66_provider_ignores_codes_that_existed_before_prime() -> None:
     old_message = {

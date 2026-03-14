@@ -76,6 +76,7 @@ rsync -a --delete \
   --exclude '.venv/' \
   --exclude '.pytest_cache/' \
   --exclude '__pycache__/' \
+  --exclude 'docs/plans/' \
   --exclude 'data/' \
   --exclude 'secrets/' \
   --exclude 'logs/' \
@@ -99,6 +100,7 @@ git push public public-master:master
 Release checklist for the public mirror:
 
 - confirm `.env`, `data/`, `secrets/`, `logs/`, SQLite files, tokens, and proxies are excluded
+- confirm `docs/plans/` is excluded from the public mirror sync
 - confirm public docs and examples do not contain private credentials or realistic account samples
 - run verification in the sanitized tree
 - re-check the published remote `master` after push

@@ -16,7 +16,6 @@ from openai_auth_core.mailbox import (
 from .models import AccountRecord
 
 
-DEFAULT_PASSWORD = "C.WLLP159357"
 DEFAULT_ACCOUNTS_FILE = Path(__file__).resolve().parents[2] / "secrets" / "openai_mail_accounts_2026-03-10.txt"
 
 
@@ -64,7 +63,6 @@ def find_account_by_email(accounts: Iterable[AccountRecord], email: str) -> Acco
 
 __all__ = [
     "DEFAULT_ACCOUNTS_FILE",
-    "DEFAULT_PASSWORD",
     "GRAPH_API_BASE",
     "GraphApiProvider",
     "MAIL_POLL_INTERVAL_SECONDS",

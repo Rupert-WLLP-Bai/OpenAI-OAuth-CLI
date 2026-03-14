@@ -10,7 +10,6 @@ import pytest
 from openai_oauth_cli import cli
 from openai_oauth_cli.accounts_db import AccountStore
 from openai_oauth_cli.callback import CallbackResult
-from openai_oauth_cli.mailbox import DEFAULT_PASSWORD
 from openai_oauth_cli.models import AccountRecord, TokenBundle
 
 
@@ -26,21 +25,91 @@ def test_login_command_prints_refresh_token(monkeypatch: pytest.MonkeyPatch, cap
     run_login.assert_awaited_once()
 
 
-def test_login_command_uses_default_password(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+def test_login_command_uses_password_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     captured_args: dict[str, object] = {}
 
     async def fake_run_login(**kwargs: object) -> str:
         captured_args.update(kwargs)
         return "rt_example"
 
+    monkeypatch.setenv("OPENAI_ACCOUNT_PASSWORD", "env-password")
     monkeypatch.setattr(cli, "run_login", fake_run_login)
 
     exit_code = cli.main(["login", "--email", "user@example.com"])
 
     _ = capsys.readouterr()
     assert exit_code == 0
-    assert captured_args["password"] == DEFAULT_PASSWORD
+    assert captured_args["password"] == "env-password"
     assert captured_args["db_path"] == str(cli.DEFAULT_DB_PATH)
+
+
+def test_login_command_uses_password_from_dotenv_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured_args: dict[str, object] = {}
+
+    async def fake_run_login(**kwargs: object) -> str:
+        captured_args.update(kwargs)
+        return "rt_example"
+
+    (tmp_path / ".env").write_text("OPENAI_ACCOUNT_PASSWORD=dotenv-password\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("OPENAI_ACCOUNT_PASSWORD", raising=False)
+    monkeypatch.setattr(cli, "run_login", fake_run_login)
+
+    exit_code = cli.main(["login", "--email", "user@example.com"])
+
+    _ = capsys.readouterr()
+    assert exit_code == 0
+    assert captured_args["password"] == "dotenv-password"
+
+
+def test_login_command_does_not_load_password_from_parent_dotenv(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    parent_dir = tmp_path / "parent"
+    child_dir = parent_dir / "child"
+    child_dir.mkdir(parents=True)
+    (parent_dir / ".env").write_text("OPENAI_ACCOUNT_PASSWORD=parent-password\n", encoding="utf-8")
+
+    monkeypatch.chdir(child_dir)
+    monkeypatch.delenv("OPENAI_ACCOUNT_PASSWORD", raising=False)
+
+    exit_code = cli.main(["login", "--email", "user@example.com"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    assert captured.err == (
+        "account password is required. "
+        "Pass `--password` or set `OPENAI_ACCOUNT_PASSWORD` in `.env` or the environment.\n"
+    )
+
+
+def test_login_command_requires_password_flag_or_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("OPENAI_ACCOUNT_PASSWORD", raising=False)
+
+    exit_code = cli.main(["login", "--email", "user@example.com"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    assert captured.err == (
+        "account password is required. "
+        "Pass `--password` or set `OPENAI_ACCOUNT_PASSWORD` in `.env` or the environment.\n"
+    )
 
 
 def test_login_command_reports_missing_or_uninitialized_db(

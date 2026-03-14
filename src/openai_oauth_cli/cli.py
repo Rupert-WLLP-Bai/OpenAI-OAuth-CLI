@@ -10,11 +10,13 @@ import sys
 from typing import Literal, cast
 import webbrowser
 
+from openai_auth_core.runtime_config import ACCOUNT_PASSWORD_ENV_VAR, resolve_account_password
+
 from .accounts_db import AccountStore
 from .admin_server import LocalAccountAdminServer
 from .browser import PatchrightBrowser
 from .callback import CallbackServer
-from .mailbox import DEFAULT_ACCOUNTS_FILE, DEFAULT_PASSWORD, create_mail_provider
+from .mailbox import DEFAULT_ACCOUNTS_FILE, create_mail_provider
 from .oauth import (
     build_auth_url,
     build_callback_url,
@@ -34,7 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     login = subparsers.add_parser("login", help="Automate login and print a refresh token")
     login.add_argument("--email", required=True, help="OpenAI account email address")
-    login.add_argument("--password", default=DEFAULT_PASSWORD, help="OpenAI account password")
+    login.add_argument(
+        "--password",
+        default=None,
+        help=f"OpenAI account password. Defaults to {ACCOUNT_PASSWORD_ENV_VAR} from .env or the environment.",
+    )
     login.add_argument("--db-path", default=str(DEFAULT_DB_PATH), help="Path to the SQLite database")
     login.add_argument(
         "--accounts-file",
@@ -287,10 +293,11 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     try:
+        password = resolve_account_password(args.password)
         refresh_token = asyncio.run(
             run_login(
                 email=args.email,
-                password=args.password,
+                password=password,
                 accounts_file=args.accounts_file,
                 db_path=args.db_path,
                 callback_port=args.callback_port,
